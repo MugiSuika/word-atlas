@@ -1,3 +1,4 @@
+import { Account } from "../auth/Account";
 import { Download, RotateCcw, Upload } from "lucide-react";
 import { useMemo, useRef } from "react";
 import { useAtlas } from "../atlas/context";
@@ -54,6 +55,8 @@ export function Me({ privateAvailable }: { privateAvailable: boolean }) {
         <p className="eyebrow">我的</p>
         <h1 className="display">你的星空</h1>
       </header>
+
+      <Account />
 
       <section className="stat-strip">
         <div>
@@ -181,7 +184,7 @@ export function Me({ privateAvailable }: { privateAvailable: boolean }) {
 
         <section className="panel">
           <h3 className="eyebrow">数据</h3>
-          <p className="muted">进度只存在这台设备的浏览器里：没有账号，没有服务器。换设备时，导出备份再导入即可。</p>
+          <p className="muted">学习进度保存在这台设备的浏览器里，登录账号不会自动同步进度。换设备时，导出备份再导入即可。</p>
           {saveError && <p className="warn-text">浏览器拒绝保存（可能是隐私模式或空间已满）。请尽快导出备份。</p>}
           <div className="data-actions">
             <button className="btn btn-ghost" onClick={download}>

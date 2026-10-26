@@ -9,3 +9,8 @@ output/
 .DS_Store
 .playwright-cli/
 *.tsbuildinfo
+.vercel/
+.vercel
+.env*
+
+!.env.example

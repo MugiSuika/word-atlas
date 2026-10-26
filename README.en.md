@@ -27,7 +27,7 @@ Every definition, sentence, illustration and recording was made new for this pro
 | **7,298** | original illustrations |
 | **14,596** | original example sentences with Chinese translations |
 | **22,905** | audio clips: UK and US pronunciation, narrated examples |
-| **0** | accounts, ads or trackers |
+| **0** | mandatory accounts, ads or trackers |
 
 <p align="center"><a href="docs/assets/demo.mp4"><b>▶ Watch the 30-second app demo</b></a></p>
 
@@ -69,6 +69,10 @@ npm test
 npm run check:atlas
 npm run build      # static site in dist/; ATLAS_BASE=/sub/path/ for sub-path hosting
 ```
+
+## Optional accounts and Vercel
+
+Email registration, login, logout, session persistence and password reset use Supabase Auth. Learning progress remains local; cross-device progress sync is not implemented. See [setup and deployment](docs/auth-and-vercel.md) for Vercel Marketplace integration, public environment variables and email callback configuration.
 
 ## How the content was made
 
