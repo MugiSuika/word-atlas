@@ -1,10 +1,28 @@
-import { BookOpen, ChevronLeft, ChevronRight, Compass, Github, Keyboard, Moon, Search, Sun, User } from "lucide-react";
+import { AccountMenu } from "./auth/AccountMenu";
+import {
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Compass,
+  Keyboard,
+  Moon,
+  Search,
+  Sun,
+  User,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { AtlasContext, useAtlas, useEntry } from "./atlas/context";
 import { loadOpenAtlas, loadPrivateAtlas } from "./atlas/data";
 import type { Atlas } from "./atlas/types";
 import { REPO_URL } from "./config";
-import { closeWord, currentLocation, go, openWord, useLocation, type Route } from "./lib/router";
+import {
+  closeWord,
+  currentLocation,
+  go,
+  openWord,
+  useLocation,
+  type Route,
+} from "./lib/router";
 import { AtlasPage } from "./pages/Atlas";
 import { About } from "./pages/About";
 import { Learn } from "./pages/Learn";
@@ -35,8 +53,13 @@ function useTheme() {
     const root = document.documentElement;
     if (theme === "system") root.removeAttribute("data-theme");
     else root.setAttribute("data-theme", theme);
-    const dark = theme === "dark" || (theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#0D1120" : "#F6F1E7");
+    const dark =
+      theme === "dark" ||
+      (theme === "system" &&
+        matchMedia("(prefers-color-scheme: dark)").matches);
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute("content", dark ? "#0D1120" : "#F6F1E7");
   }, [theme]);
   return theme;
 }
@@ -94,6 +117,7 @@ export default function App() {
 function Shell({ privateAvailable }: { privateAvailable: boolean }) {
   const { route, word } = useLocation();
   const onboarded = useStore((s) => s.settings.onboarded);
+  const locked = useStore((s) => s.locked);
   const theme = useStore((s) => s.settings.theme);
   const [palette, setPalette] = useState(false);
   const [splash, setSplash] = useState(shouldShowSplash);
@@ -119,40 +143,62 @@ function Shell({ privateAvailable }: { privateAvailable: boolean }) {
     if (!word) window.scrollTo({ top: 0 });
   }, [route.page]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const dark = theme === "dark" || (theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+  const dark =
+    theme === "dark" ||
+    (theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
 
   return (
     <div className={`app ${focus ? "is-focus" : ""}`}>
       {!focus && (
         <header className="topbar">
-          <a className="topbar-logo" href="#/" aria-label="词光 Word Atlas 首页">
+          <a
+            className="topbar-logo"
+            href="#/"
+            aria-label="词光 Word Atlas 首页"
+          >
             <Logo />
           </a>
           <nav className="topnav" aria-label="主导航">
             {NAV.map(({ page, label }) => (
-              <a key={page} href={page === "today" ? "#/" : `#/${page}`} className={route.page === page ? "is-on" : ""} aria-current={route.page === page ? "page" : undefined}>
+              <a
+                key={page}
+                href={page === "today" ? "#/" : `#/${page}`}
+                className={route.page === page ? "is-on" : ""}
+                aria-current={route.page === page ? "page" : undefined}
+              >
                 {label}
               </a>
             ))}
           </nav>
           <div className="topbar-tools">
-            <button className="search-pill" onClick={() => setPalette(true)} aria-label="搜索单词">
+            <button
+              className="search-pill"
+              onClick={() => setPalette(true)}
+              aria-label="搜索单词"
+            >
               <Search size={17} />
               <span>搜索单词</span>
               <kbd>⌘K</kbd>
             </button>
             <AmbiencePicker />
-            <button className="icon-btn" onClick={() => store.settings({ theme: dark ? "light" : "dark" })} aria-label={dark ? "切换到浅色" : "切换到深色"}>
+            <button
+              className="icon-btn"
+              onClick={() => store.settings({ theme: dark ? "light" : "dark" })}
+              aria-label={dark ? "切换到浅色" : "切换到深色"}
+            >
               {dark ? <Sun size={19} /> : <Moon size={19} />}
             </button>
-            <a className="icon-btn hide-sm" href="#/about" aria-label="关于与开源" title="关于与开源">
-              <Github size={19} />
-            </a>
+            <AccountMenu />
           </div>
         </header>
       )}
 
-      <main className="main" id="main">
+      <main
+        className="main"
+        id="main"
+        inert={locked && route.page !== "me"}
+        aria-busy={locked}
+      >
         {route.page === "today" && <Today />}
         {route.page === "atlas" && <AtlasPage route={route} />}
         {route.page === "learn" && <Learn />}
@@ -177,7 +223,12 @@ function Shell({ privateAvailable }: { privateAvailable: boolean }) {
       {!focus && (
         <nav className="tabbar" aria-label="主导航">
           {NAV.map(({ page, label, icon: Icon }) => (
-            <a key={page} href={page === "today" ? "#/" : `#/${page}`} className={route.page === page ? "is-on" : ""} aria-current={route.page === page ? "page" : undefined}>
+            <a
+              key={page}
+              href={page === "today" ? "#/" : `#/${page}`}
+              className={route.page === page ? "is-on" : ""}
+              aria-current={route.page === page ? "page" : undefined}
+            >
               <Icon size={22} strokeWidth={route.page === page ? 2.1 : 1.7} />
               <span>{label}</span>
             </a>
@@ -187,7 +238,9 @@ function Shell({ privateAvailable }: { privateAvailable: boolean }) {
 
       <WordSheet id={word} />
       <Palette open={palette} onClose={() => setPalette(false)} />
-      {!onboarded && route.page !== "about" && !splash && <Onboarding />}
+      {!onboarded && !locked && route.page !== "about" && !splash && (
+        <Onboarding />
+      )}
       {splash && <Splash onDone={() => setSplash(false)} />}
       <Toasts />
       <AmbienceController />
@@ -222,7 +275,12 @@ function WordSheet({ id }: { id: string | null }) {
     return () => window.removeEventListener("keydown", on);
   }, [id, neighbor]);
   return (
-    <Sheet open={!!id} onClose={closeWord} label={ref ? `${ref.word} 词条` : "词条"} wide>
+    <Sheet
+      open={!!id}
+      onClose={closeWord}
+      label={ref ? `${ref.word} 词条` : "词条"}
+      wide
+    >
       {entry ? (
         <EntryView key={entry.id} entry={entry} />
       ) : error ? (
@@ -232,13 +290,23 @@ function WordSheet({ id }: { id: string | null }) {
       )}
       {ref && (
         <nav className="sheet-nav" aria-label="切换词条">
-          <button className="icon-btn" onClick={() => neighbor(-1)} disabled={ref.order === 0} aria-label="上一个">
+          <button
+            className="icon-btn"
+            onClick={() => neighbor(-1)}
+            disabled={ref.order === 0}
+            aria-label="上一个"
+          >
             <ChevronLeft size={20} />
           </button>
           <span>
             {(ref.order + 1).toLocaleString()} / {atlas.count.toLocaleString()}
           </span>
-          <button className="icon-btn" onClick={() => neighbor(1)} disabled={ref.order >= atlas.count - 1} aria-label="下一个">
+          <button
+            className="icon-btn"
+            onClick={() => neighbor(1)}
+            disabled={ref.order >= atlas.count - 1}
+            aria-label="下一个"
+          >
             <ChevronRight size={20} />
           </button>
         </nav>

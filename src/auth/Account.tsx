@@ -4,9 +4,12 @@ import { supabase, authRedirect } from "./client";
 import { authMessage } from "./config";
 import { useAuth } from "./AuthProvider";
 import { Profile } from "./Profile";
+import { useAccountData } from "./AccountDataProvider";
+import { SYNC_LABELS } from "./SyncNotice";
 
 export function Account() {
   const { session, loading, error: sessionError } = useAuth();
+  const account = useAccountData();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -63,7 +66,7 @@ export function Account() {
       </div>
       <p className="muted">
         使用 Google
-        账号登录并管理个人资料。学习进度保存在当前浏览器中，可通过备份迁移到其他设备。
+        账号登录并同步学习记录、未完成任务和设置。离线时保留本机修改，联网后继续同步。
       </p>
       {!supabase ? (
         <p role="status" className="muted">
@@ -78,7 +81,23 @@ export function Account() {
             <span>{session.user.email}</span>
             <span className="chip">Google 已登录</span>
           </div>
-          <Profile key={session.user.id} userId={session.user.id} />
+          <Profile />
+          <p role="status" className="sync-status">
+            {SYNC_LABELS[account.status]}
+          </p>
+          {account.message && (
+            <p className="warn-text" role="alert">
+              {account.message}
+            </p>
+          )}
+          {["error", "offline"].includes(account.status) && (
+            <button
+              className="btn btn-ghost"
+              onClick={() => void account.sync.refresh()}
+            >
+              重试同步
+            </button>
+          )}
           <div className="data-actions">
             <button className="btn btn-ghost" onClick={signOut} disabled={busy}>
               <LogOut size={18} />

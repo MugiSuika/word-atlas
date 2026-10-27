@@ -1,322 +1,244 @@
 import { useSyncExternalStore } from "react";
-import type { Accent } from "../atlas/types";
-import type { CardState, Grade } from "./srs";
-
-export type QuizKind = "meaning" | "picture" | "listen" | "spell";
-export type Step = { id: string; kind: "intro" } | { id: string; kind: QuizKind; retry?: boolean; options?: string[] };
-
-export interface ActiveSession {
-  id: string;
-  started: number;
-  steps: Step[];
-  index: number;
-  /** First-attempt grade per word; retries never change it. */
-  graded: Record<string, Grade>;
-  newIds: string[];
-  reviewIds: string[];
-  /** Answer shown but not yet continued; survives reload without double counting. */
-  pending?: { correct: boolean; value: string };
-  finished?: number;
-}
-
-export interface DayStat {
-  n: number; // new words met
-  r: number; // graded reviews (first attempts)
-  c: number; // correct first attempts
-  t: number; // active seconds
-}
-
-export interface TypingRound {
-  at: number;
-  mode: "word" | "sentence" | "dictation";
-  items: number;
-  wpm: number;
-  accuracy: number;
-}
-
-export interface Progress {
-  version: 2;
-  datasetId: string;
-  cards: Record<string, CardState>;
-  bookmarks: string[];
-  days: Record<string, DayStat>;
-  typing: TypingRound[];
-  session: ActiveSession | null;
-  /** Rolling list of recent mistakes, newest first. */
-  mistakes: string[];
-}
-
-export interface Settings {
-  accent: Accent;
-  autoplay: boolean;
-  dailyNew: number;
-  retention: number;
-  theme: "system" | "light" | "dark";
-  sfx: boolean;
-  spell: boolean;
-  startLevel: number;
-  onboarded: boolean;
-  dataset: "open" | "private";
-  ambience: "off" | "stars" | "rain" | "sea" | "forest" | "fire" | "voyage" | "cafe";
-  ambienceVolume: number;
-  splash: boolean;
-}
-
-export const defaultSettings: Settings = {
-  accent: "uk",
-  autoplay: true,
-  dailyNew: 10,
-  retention: 0.9,
-  theme: "dark",
-  sfx: true,
-  spell: true,
-  startLevel: 0,
-  onboarded: false,
-  dataset: "open",
-  ambience: "stars",
-  ambienceVolume: 0.45,
-  splash: true,
-};
-
-export const emptyProgress = (datasetId: string): Progress => ({
-  version: 2,
-  datasetId,
-  cards: {},
-  bookmarks: [],
-  days: {},
-  typing: [],
-  session: null,
-  mistakes: [],
-});
-
-export const dayKey = (d = new Date()) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-
+import {
+  defaultSettings,
+  emptyLearning,
+  emptyProgress,
+  sanitizeProgress,
+  sanitizeSettings,
+  validId,
+  dayKey,
+  type DayStat,
+  type LearningData,
+  type Progress,
+  type Settings,
+} from "./model";
+import { serializeBackup } from "./backup";
+export * from "./model";
 const SETTINGS_KEY = "word-atlas:settings";
 const progressKey = (id: string) => `word-atlas:v2:${id}`;
-
-function read<T>(key: string): T | null {
+function read(key: string): unknown {
   try {
     const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : null;
+    return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
   }
 }
-function write(key: string, value: unknown) {
+function readGuest(): LearningData {
+  const data = emptyLearning();
+  data.settings = sanitizeSettings(read(SETTINGS_KEY));
   try {
-    localStorage.setItem(key, JSON.stringify(value));
-    return true;
+    if (!isViewStored()) {
+      const view = localStorage.getItem("word-atlas:view");
+      if (view === "grid" || view === "list" || view === "galaxy")
+        data.settings.atlasView = view;
+    }
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith("word-atlas:v2:")) {
+        const id = key.slice("word-atlas:v2:".length);
+        if (validId(id)) data.datasets[id] = sanitizeProgress(read(key), id);
+      }
+    }
   } catch {
-    return false;
+    /* SSR or unavailable browser storage */
   }
+  return data;
 }
-
-/* ---------- validation (backups and stored data are untrusted) ---------- */
-
-const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
-const num = (v: unknown, lo = -Infinity, hi = Infinity) => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi;
-
-function validCard(v: unknown): v is CardState {
-  return (
-    isObj(v) &&
-    num(v.due, 0) &&
-    num(v.s, 0) &&
-    num(v.d, 0, 11) &&
-    num(v.el, 0) &&
-    num(v.sd, 0) &&
-    num(v.ls, 0) &&
-    num(v.reps, 0) &&
-    num(v.lapses, 0) &&
-    [0, 1, 2, 3].includes(v.st as number) &&
-    (v.last === undefined || num(v.last, 0)) &&
-    num(v.seen, 0)
-  );
+function isViewStored() {
+  const v = read(SETTINGS_KEY);
+  return !!v && typeof v === "object" && "atlasView" in v;
 }
-
-export function sanitizeProgress(v: unknown, datasetId: string): Progress {
-  const out = emptyProgress(datasetId);
-  if (!isObj(v) || v.version !== 2) return out;
-  if (isObj(v.cards)) for (const [k, c] of Object.entries(v.cards)) if (validCard(c)) out.cards[k] = c;
-  if (Array.isArray(v.bookmarks)) out.bookmarks = v.bookmarks.filter((x): x is string => typeof x === "string").slice(0, 20000);
-  if (Array.isArray(v.mistakes)) out.mistakes = v.mistakes.filter((x): x is string => typeof x === "string").slice(0, 300);
-  if (isObj(v.days))
-    for (const [k, d] of Object.entries(v.days))
-      if (/^\d{4}-\d{2}-\d{2}$/.test(k) && isObj(d) && num(d.n, 0) && num(d.r, 0) && num(d.c, 0) && num(d.t, 0))
-        out.days[k] = { n: d.n as number, r: d.r as number, c: d.c as number, t: d.t as number };
-  if (Array.isArray(v.typing))
-    out.typing = v.typing
-      .filter(
-        (t): t is TypingRound =>
-          isObj(t) && num(t.at, 0) && ["word", "sentence", "dictation"].includes(t.mode as string) && num(t.items, 0) && num(t.wpm, 0, 400) && num(t.accuracy, 0, 100),
-      )
-      .slice(-500);
-  const s = v.session;
-  if (isObj(s) && typeof s.id === "string" && Array.isArray(s.steps) && num(s.index, 0) && isObj(s.graded))
-    out.session = s as unknown as ActiveSession;
-  return out;
-}
-
-export function sanitizeSettings(v: unknown): Settings {
-  const s = { ...defaultSettings };
-  if (!isObj(v)) return s;
-  if (v.accent === "uk" || v.accent === "us") s.accent = v.accent;
-  if (typeof v.autoplay === "boolean") s.autoplay = v.autoplay;
-  if (num(v.dailyNew, 0, 100)) s.dailyNew = Math.round(v.dailyNew as number);
-  if (num(v.retention, 0.7, 0.97)) s.retention = v.retention as number;
-  if (v.theme === "system" || v.theme === "light" || v.theme === "dark") s.theme = v.theme;
-  if (typeof v.sfx === "boolean") s.sfx = v.sfx;
-  if (typeof v.spell === "boolean") s.spell = v.spell;
-  if (num(v.startLevel, 0, 5)) s.startLevel = Math.round(v.startLevel as number);
-  if (typeof v.onboarded === "boolean") s.onboarded = v.onboarded;
-  if (v.dataset === "open" || v.dataset === "private") s.dataset = v.dataset;
-  if (["off", "stars", "rain", "sea", "forest", "fire", "voyage", "cafe"].includes(v.ambience as string)) s.ambience = v.ambience as Settings["ambience"];
-  if (num(v.ambienceVolume, 0, 1)) s.ambienceVolume = v.ambienceVolume as number;
-  if (typeof v.splash === "boolean") s.splash = v.splash;
-  return s;
-}
-
-/* ---------- store ---------- */
-
 interface State {
   progress: Progress;
   settings: Settings;
   saveError: boolean;
+  locked: boolean;
+  owner: string | null;
 }
-
+let data = readGuest();
+let guest = data;
 let state: State = {
   progress: emptyProgress("word-atlas-open"),
-  settings: sanitizeSettings(read(SETTINGS_KEY)),
+  settings: data.settings,
   saveError: false,
+  locked: false,
+  owner: null,
 };
 const listeners = new Set<() => void>();
-let saveTimer: number | undefined;
-/** Only write when this tab changed something, so idle tabs never clobber newer data. */
+const changes = new Set<(data: LearningData) => void>();
 let dirty = false;
-/** Progress is written only after it has been read from storage for this dataset. */
-let loadedId: string | null = null;
-
-function emit() {
-  listeners.forEach((l) => l());
-}
-
-function scheduleSave() {
-  dirty = true;
-  window.clearTimeout(saveTimer);
-  saveTimer = window.setTimeout(flush, 250);
-}
-
-export function flush() {
-  window.clearTimeout(saveTimer);
-  if (!dirty) return;
-  dirty = false;
-  const progressOk = loadedId !== state.progress.datasetId || write(progressKey(state.progress.datasetId), state.progress);
-  const ok = progressOk && write(SETTINGS_KEY, state.settings);
-  if (ok === state.saveError) {
-    state = { ...state, saveError: !ok };
+let legacyError = false,
+  cacheError = false;
+function updateSaveError() {
+  const saveError = legacyError || cacheError;
+  if (saveError !== state.saveError) {
+    state = { ...state, saveError };
     emit();
   }
 }
-
-if (typeof window !== "undefined") {
-  window.addEventListener("pagehide", flush);
-  document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && flush());
-  // Another tab saved: adopt its data instead of keeping a stale copy.
-  window.addEventListener("storage", (e) => {
-    if (!e.newValue) return;
-    try {
-      if (e.key === SETTINGS_KEY) state = { ...state, settings: sanitizeSettings(JSON.parse(e.newValue)) };
-      else if (e.key === progressKey(state.progress.datasetId))
-        state = { ...state, progress: sanitizeProgress(JSON.parse(e.newValue), state.progress.datasetId) };
-      else return;
-      emit();
-    } catch {
-      /* ignore malformed writes */
-    }
-  });
+let saveTimer: ReturnType<typeof setTimeout> | undefined;
+const emit = () => listeners.forEach((f) => f());
+function assign(next: LearningData) {
+  // Word IDs such as constructor are ordinary keys, never inherited properties.
+  Object.setPrototypeOf(next.datasets, null);
+  for (const p of Object.values(next.datasets)) {
+    Object.setPrototypeOf(p.cards, null);
+    Object.setPrototypeOf(p.days, null);
+    if (p.session) Object.setPrototypeOf(p.session.graded, null);
+  }
+  data = next;
+  if (!state.owner) guest = next;
+  state = {
+    ...state,
+    settings: next.settings,
+    progress:
+      next.datasets[state.progress.datasetId] ??
+      emptyProgress(state.progress.datasetId),
+  };
+  emit();
 }
-
+function changed(next: LearningData) {
+  assign(next);
+  changes.forEach((f) => f(next));
+  if (!state.owner) {
+    dirty = true;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(flush, 250);
+  }
+}
+export function flush() {
+  clearTimeout(saveTimer);
+  if (!dirty || state.owner) return;
+  dirty = false;
+  try {
+    // IndexedDB is authoritative after a transactional import; these preserve legacy guest compatibility.
+    const keep = new Set(Object.keys(data.datasets).map(progressKey));
+    const remove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k?.startsWith("word-atlas:v2:") && !keep.has(k)) remove.push(k);
+    }
+    for (const k of remove) localStorage.removeItem(k);
+    for (const [id, p] of Object.entries(data.datasets))
+      localStorage.setItem(progressKey(id), JSON.stringify(p));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(data.settings));
+    legacyError = false;
+    updateSaveError();
+  } catch {
+    legacyError = true;
+    updateSaveError();
+  }
+}
 export const store = {
   get: () => state,
-  subscribe(l: () => void) {
-    listeners.add(l);
-    return () => listeners.delete(l);
+  learning: () => data,
+  guest: () => guest,
+  subscribe(f: () => void) {
+    listeners.add(f);
+    return () => listeners.delete(f);
   },
-  useDataset(datasetId: string) {
-    flush();
-    state = { ...state, progress: sanitizeProgress(read(progressKey(datasetId)), datasetId) };
-    loadedId = datasetId;
-    emit();
+  onChange(f: (data: LearningData) => void) {
+    changes.add(f);
+    return () => changes.delete(f);
+  },
+  useDataset(id: string) {
+    if (validId(id)) {
+      state = { ...state, progress: data.datasets[id] ?? emptyProgress(id) };
+      emit();
+    }
   },
   progress(fn: (p: Progress) => Progress) {
-    state = { ...state, progress: fn(state.progress) };
-    emit();
-    scheduleSave();
+    if (!state.locked) {
+      const p = fn(state.progress);
+      if (p !== state.progress)
+        changed({ ...data, datasets: { ...data.datasets, [p.datasetId]: p } });
+    }
   },
   settings(patch: Partial<Settings>) {
-    state = { ...state, settings: { ...state.settings, ...patch } };
+    if (!state.locked)
+      changed({ ...data, settings: { ...data.settings, ...patch } });
+  },
+  adopt(next: LearningData) {
+    assign(next);
+  },
+  replace(next: LearningData) {
+    assign(next);
+    if (!state.owner) {
+      dirty = true;
+      flush();
+    }
+  },
+  owner(uid: string | null) {
+    flush();
+    if (uid) legacyError = false;
+    cacheError = false;
+    state = { ...state, owner: uid, locked: !!uid, saveError: false };
+    assign(uid ? emptyLearning() : guest);
+  },
+  lock(locked: boolean) {
+    state = { ...state, locked };
     emit();
-    scheduleSave();
+  },
+  saveError(failed: boolean) {
+    cacheError = failed;
+    updateSaveError();
   },
 };
-
 export function useStore<T>(select: (s: State) => T): T {
-  return useSyncExternalStore(store.subscribe, () => select(state), () => select(state));
+  return useSyncExternalStore(
+    store.subscribe,
+    () => select(state),
+    () => select(state),
+  );
 }
-
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (event) => {
+    if (
+      state.owner ||
+      state.locked ||
+      !event.key ||
+      !(event.key === SETTINGS_KEY || event.key.startsWith("word-atlas:v2:"))
+    )
+      return;
+    const incoming = readGuest();
+    assign(incoming);
+    changes.forEach((fn) => fn(incoming));
+  });
+  window.addEventListener("pagehide", flush);
+  document.addEventListener(
+    "visibilitychange",
+    () => document.visibilityState === "hidden" && flush(),
+  );
+}
 export function bumpDay(p: Progress, patch: Partial<DayStat>): Progress {
-  const k = dayKey();
-  const d = p.days[k] ?? { n: 0, r: 0, c: 0, t: 0 };
+  const k = dayKey(),
+    d = p.days[k] ?? { n: 0, r: 0, c: 0, t: 0 };
   return {
     ...p,
     days: {
       ...p.days,
-      [k]: { n: d.n + (patch.n ?? 0), r: d.r + (patch.r ?? 0), c: d.c + (patch.c ?? 0), t: d.t + (patch.t ?? 0) },
+      [k]: {
+        n: d.n + (patch.n ?? 0),
+        r: d.r + (patch.r ?? 0),
+        c: d.c + (patch.c ?? 0),
+        t: d.t + (patch.t ?? 0),
+      },
     },
   };
 }
-
 export function toggleBookmark(id: string) {
   store.progress((p) => ({
     ...p,
-    bookmarks: p.bookmarks.includes(id) ? p.bookmarks.filter((x) => x !== id) : [id, ...p.bookmarks],
+    bookmarks: p.bookmarks.includes(id)
+      ? p.bookmarks.filter((x) => x !== id)
+      : [id, ...p.bookmarks],
   }));
 }
-
-/* ---------- backup ---------- */
-
 export function exportBackup() {
-  flush();
-  const { progress, settings } = state;
-  return JSON.stringify({ app: "word-atlas", version: 2, exported: new Date().toISOString(), progress: { ...progress, session: null }, settings }, null, 1);
+  return serializeBackup(data);
 }
-
-function markDirty() {
-  dirty = true;
-}
-
-export function importBackup(text: string): { ok: true; cards: number } | { ok: false; error: string } {
-  let data: unknown;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    return { ok: false, error: "文件不是有效的 JSON。" };
-  }
-  if (!isObj(data) || data.app !== "word-atlas" || data.version !== 2 || !isObj(data.progress))
-    return { ok: false, error: "这不是词光的学习备份。" };
-  const id = state.progress.datasetId;
-  if (data.progress.datasetId !== id) return { ok: false, error: "备份来自另一个词库，请先切换到对应词库。" };
-  const progress = sanitizeProgress({ ...data.progress, session: null }, id);
-  state = { ...state, progress, settings: { ...sanitizeSettings(data.settings), onboarded: true } };
-  emit();
-  markDirty();
-  flush();
-  return { ok: true, cards: Object.keys(progress.cards).length };
-}
-
 export function resetProgress() {
-  state = { ...state, progress: emptyProgress(state.progress.datasetId) };
-  emit();
-  markDirty();
-  flush();
+  store.progress((p) => emptyProgress(p.datasetId));
 }
+export { defaultSettings };

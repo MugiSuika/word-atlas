@@ -6,7 +6,7 @@ import type { WordRef } from "../atlas/types";
 import { morphFrom } from "../lib/motion";
 import { go, openWord, type Route } from "../lib/router";
 import { isMastered } from "../store/srs";
-import { useStore } from "../store/store";
+import { store, useStore } from "../store/store";
 import { Illustration } from "../ui/Illustration";
 import { searchAtlas } from "../ui/Palette";
 import { Speak } from "../ui/Speak";
@@ -20,16 +20,6 @@ const STATUS: [Status, string][] = [
   ["saved", "收藏"],
 ];
 
-type View = "grid" | "list" | "galaxy";
-function readView(): View {
-  try {
-    const v = localStorage.getItem("word-atlas:view");
-    return v === "list" || v === "galaxy" ? v : "grid";
-  } catch {
-    return "grid";
-  }
-}
-
 export function AtlasPage({
   route,
 }: {
@@ -40,17 +30,17 @@ export function AtlasPage({
   const bookmarks = useStore((s) => s.progress.bookmarks);
   const [q, setQ] = useState(route.q ?? "");
   const [status, setStatus] = useState<Status>("all");
-  const [view, setViewState] = useState<View>(() =>
-    route.view === "galaxy" || route.view === "list" || route.view === "grid"
-      ? route.view
-      : readView(),
-  );
-  // Follow the URL when a link switches views while this page is already open.
+  const view = useStore((s) => s.settings.atlasView);
   useEffect(() => {
-    if (route.view === "grid" || route.view === "list" || route.view === "galaxy") setViewState(route.view);
+    if (
+      route.view === "grid" ||
+      route.view === "list" ||
+      route.view === "galaxy"
+    )
+      store.settings({ atlasView: route.view });
   }, [route.view]);
-  const setView = (v: View) => {
-    setViewState(v);
+  const setView = (v: "grid" | "list" | "galaxy") => {
+    store.settings({ atlasView: v });
     go(
       {
         page: "atlas",
@@ -64,14 +54,6 @@ export function AtlasPage({
   };
   const topic = route.topic;
   const level = route.level;
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("word-atlas:view", view);
-    } catch {
-      /* optional */
-    }
-  }, [view]);
 
   const list = useMemo(() => {
     const saved = new Set(bookmarks);
@@ -104,7 +86,8 @@ export function AtlasPage({
             都有一幅画。
           </h1>
           <p className="lede">
-            {atlas.examples.toLocaleString()} 条原创例句 · 英美发音 · 按难度和 {atlas.topics.length} 个雅思话题整理
+            {atlas.examples.toLocaleString()} 条原创例句 · 英美发音 · 按难度和{" "}
+            {atlas.topics.length} 个雅思话题整理
           </p>
         </div>
         <label className="search">
@@ -329,7 +312,12 @@ function VirtualGrid({
               width: cell,
               height: rowH - gap,
             }}
-            onClick={(e) => morphFrom(e.currentTarget.querySelector<HTMLElement>(".illo"), () => openWord(w.id))}
+            onClick={(e) =>
+              morphFrom(
+                e.currentTarget.querySelector<HTMLElement>(".illo"),
+                () => openWord(w.id),
+              )
+            }
           >
             <Illustration
               src={atlas.img(w, "thumb")}
