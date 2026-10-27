@@ -75,3 +75,7 @@ Google-only 页面已发布到生产，功能部署 ID：`dpl_4jior2qvjUSQzwPJ9t
 `https://word-atlas.vidu8.online/` 已在 Vercel 项目 `word-atlas` 中绑定并通过域名验证。页面 canonical、Open Graph / Twitter 分享地址和文档使用该域名。`vercel.json` 将旧的两个公开 Vercel 主机重定向到该域名，保留路径与查询参数。Google Cloud 的授权回调仍为 Supabase 的 `/auth/v1/callback`，不随网站域名变更。
 
 当前云任务的 HTTP 代理拒绝新域名，所需精确域名规则已保存到环境配置草稿，须应用后才能从本任务完成新域名 HTTPS 与实际 Google 登录的完整验证。
+
+新域名版本部署 ID：`dpl_3LT9dWEkDvpzLcbC4v16LusTyWr5`，Vercel 返回 `READY`，生产域名为 `word-atlas.vidu8.online`。Vercel DNS 检查为 `configuredBy=CNAME`、`misconfigured=false`。旧公开域名 `word-atlas-gules.vercel.app` 另已设置 Vercel 域名级 308 跳转，实际请求确认路径和查询参数完整保留。
+
+截图确认 Google Cloud Web 客户端已创建，JavaScript 来源和 Supabase 回调 URI 均正确；Supabase Site URL / Redirect URL 也填写正确。但对最新生产变量指向的项目做无缓存请求，仍读到 `external.google=false`、`external.email=true`，实际 Google 授权请求返回 HTTP 400：`Unsupported provider: provider is not enabled`。下一步应检查 Supabase Google 提供商中的 Client ID / Client Secret、启用开关与保存状态，而不是重新创建 Google 客户端或更改这四个正确的 URL。
