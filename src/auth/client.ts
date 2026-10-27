@@ -23,3 +23,18 @@ export function authRedirect() {
     window.location.origin,
   ).href;
 }
+
+/** Check the public provider settings before sending users to OAuth. */
+export async function googleLoginAvailable(): Promise<boolean> {
+  if (!config) return false;
+  const response = await fetch(`${config.url}/auth/v1/settings`, {
+    headers: { apikey: config.key },
+    cache: "no-store",
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok) throw new Error("Login service unavailable");
+  const settings = (await response.json()) as {
+    external?: { google?: boolean };
+  };
+  return settings.external?.google === true;
+}

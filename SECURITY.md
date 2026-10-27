@@ -2,9 +2,9 @@
 
 ## 数据去哪里
 
-学习进度只保存在当前浏览器的 localStorage，可以在「我的」里导出为 JSON 备份。导入备份时会逐字段校验，畸形数据会被丢弃。可选账号功能使用 Supabase Auth，邮箱、密码和会话请求发送到站点配置的 Supabase 项目；认证会话由 SDK 保存在本机并自动刷新。登录不会上传或同步学习进度。用户保存的昵称存于 Supabase `public.profiles` 表，按用户 ID 配置行级安全策略（RLS），只有本人可读写。退出会清除当前浏览器的认证会话，学习备份与本机进度独立保留。
+学习进度只保存在当前浏览器的 localStorage，可以在「我的」里导出为 JSON 备份。导入备份时会逐字段校验，畸形数据会被丢弃。可选账号功能仅提供 Google OAuth，由 Google 和 Supabase Auth 处理身份验证，本站不收集或设置密码。认证会话由 SDK 保存在本机并自动刷新。前端移除了邮箱注册、密码登录和密码重置；Supabase 后台也需关闭 Email 提供商，才能禁止这些 API 认证方式。登录不会上传或同步学习进度。用户保存的昵称存于 Supabase `public.profiles` 表，按用户 ID 配置行级安全策略（RLS），只有本人可读写。退出会清除当前浏览器的认证会话，学习备份与本机进度独立保留。
 
-Progress lives in the browser's localStorage and can be exported as JSON. Optional accounts use Supabase Auth for email/password authentication and persisted sessions. Learning progress is not uploaded or synchronized. Imported backups are validated field by field.
+Progress lives in the browser's localStorage and can be exported as JSON. Optional accounts use Google OAuth through Supabase Auth with persisted sessions. The app has no email registration or password login UI; the Supabase Email provider must also be disabled to enforce that restriction on the server. Learning progress is not uploaded or synchronized. Imported backups are validated field by field.
 
 ## 凭据 / Credentials
 

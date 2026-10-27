@@ -39,8 +39,8 @@ test("only public publishable and legacy anon keys are accepted", () => {
   }
 });
 test("auth errors give actionable messages without exposing remote error details", () => {
-  assert.match(authMessage({ code: "invalid_credentials" }), /邮箱或密码/);
-  assert.match(authMessage({ code: "email_not_confirmed" }), /验证邮箱/);
+  assert.match(authMessage({ code: "access_denied" }), /取消/);
+  assert.match(authMessage({ code: "provider_disabled" }), /暂未开放/);
   assert.match(authMessage({ status: 429 }), /频繁/);
   assert.match(authMessage({ code: "database-secret-error" }), /重试/);
   assert.match(authMessage(null), /网络/);

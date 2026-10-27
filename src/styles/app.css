@@ -4126,7 +4126,6 @@ a:hover .mark-needle,
 .account-heading, .account-identity { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .account-heading h2 { font-size: 22px; }
 .account-panel > .muted { margin: 12px 0 18px; }
-.account-tabs { width: fit-content; margin-bottom: 20px; }
 .account-form { display: grid; gap: 16px; max-width: 440px; }
 .account-form label { display: grid; gap: 8px; font-size: 14px; font-weight: 500; }
 .account-form input { min-width: 0; width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--paper); color: var(--ink); font: inherit; font-size: 16px; }
@@ -4135,7 +4134,6 @@ a:hover .mark-needle,
 .account-form small { font-weight: 400; }
 .account-panel [role="alert"], .account-panel > [role="status"] { margin-top: 16px; }
 .account-identity span { overflow-wrap: anywhere; min-width: 0; }
-.account-recovery { border: 0; padding: 0; width: min(calc(100% - 32px), 480px); max-height: calc(100% - 32px); background: transparent; color: var(--ink); }
-.account-recovery::backdrop { background: rgba(13, 17, 32, 0.8); }
-.account-recovery .muted { margin: 12px 0 20px; }
 .account-profile-form { margin: 20px 0; }
+
+.account-google { display: grid; justify-items: start; gap: 12px; }

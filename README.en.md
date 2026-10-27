@@ -72,7 +72,7 @@ npm run build      # static site in dist/; ATLAS_BASE=/sub/path/ for sub-path ho
 
 ## Optional accounts and Vercel
 
-Email registration, login, logout, session persistence and password reset use Supabase Auth. Learning progress remains local; cross-device progress sync is not implemented. See [setup and deployment](docs/auth-and-vercel.md) for Vercel Marketplace integration, public environment variables and email callback configuration.
+Optional Google-only login, logout and session persistence use Supabase Auth; there is no email registration or password login UI. Learning progress remains local; cross-device progress sync is not implemented. See [setup and deployment](docs/auth-and-vercel.md) for Vercel Marketplace integration, public environment variables and email callback configuration.
 
 ## How the content was made
 

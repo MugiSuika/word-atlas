@@ -7,19 +7,19 @@ import { chromium } from "playwright";
 const base = "http://127.0.0.1:5190";
 const authOrigin = "https://word-atlas-auth-test.supabase.co";
 const userId = "11111111-1111-4111-8111-111111111111";
-const user = {
+const googleUser = {
   id: userId,
   aud: "authenticated",
   role: "authenticated",
   email: "learner@example.com",
   email_confirmed_at: "2026-01-01T00:00:00Z",
-  app_metadata: { provider: "email", providers: ["email"] },
+  app_metadata: { provider: "google", providers: ["google"] },
   user_metadata: {},
   created_at: "2026-01-01T00:00:00Z",
   identities: [],
 };
 const token = `${Buffer.from('{"alg":"HS256","typ":"JWT"}').toString("base64url")}.${Buffer.from(JSON.stringify({ sub: userId, aud: "authenticated", role: "authenticated", exp: Math.floor(Date.now() / 1000) + 3600 })).toString("base64url")}.test-signature`;
-const session = () => ({
+const session = (user = googleUser) => ({
   access_token: token,
   refresh_token: "mock-refresh-token",
   token_type: "bearer",
@@ -27,9 +27,9 @@ const session = () => ({
   expires_at: Math.floor(Date.now() / 1000) + 3600,
   user,
 });
-let server;
-let browser;
-let serverOutput = "";
+let server,
+  browser,
+  serverOutput = "";
 before(async () => {
   server = spawn(
     process.execPath,
@@ -84,27 +84,40 @@ async function fixture(t, options = {}) {
     reducedMotion: "reduce",
   });
   t.after(() => context.close());
-  await context.addInitScript(() => {
-    localStorage.setItem(
-      "word-atlas:settings",
-      JSON.stringify({
-        onboarded: true,
-        splash: false,
-        ambience: "off",
-        sfx: false,
-      }),
-    );
-  });
-  const requests = [];
-  const errors = [];
+  const legacyUser = {
+    ...googleUser,
+    app_metadata: { provider: "email", providers: ["email"] },
+  };
+  await context.addInitScript(
+    ({ legacy }) => {
+      localStorage.setItem(
+        "word-atlas:settings",
+        JSON.stringify({
+          onboarded: true,
+          splash: false,
+          ambience: "off",
+          sfx: false,
+        }),
+      );
+      if (legacy)
+        localStorage.setItem(
+          "sb-word-atlas-auth-test-auth-token",
+          JSON.stringify(legacy),
+        );
+    },
+    { legacy: options.legacyEmail ? session(legacyUser) : null },
+  );
+  let googleEnabled = options.googleEnabled !== false;
   let savedName = "词光学员";
+  const requests = [],
+    errors = [];
   const page = await context.newPage();
   page.setDefaultTimeout(10000);
   page.on("pageerror", (error) => errors.push(error.message));
   await context.route(`${authOrigin}/**`, async (route) => {
-    const request = route.request();
-    const url = new URL(request.url());
-    const data = request.postDataJSON();
+    const request = route.request(),
+      url = new URL(request.url()),
+      data = request.postDataJSON();
     requests.push({
       path: url.pathname,
       query: url.searchParams,
@@ -120,27 +133,24 @@ async function fixture(t, options = {}) {
           "access-control-expose-headers": "X-Supabase-Api-Version",
         },
       });
-    if (url.pathname === "/auth/v1/token") {
-      if (
-        options.invalidLogin &&
-        url.searchParams.get("grant_type") === "password"
-      )
-        return reply(
-          { code: "invalid_credentials", msg: "Invalid login credentials" },
-          400,
-        );
-      return reply(session());
-    }
-    if (url.pathname === "/auth/v1/user") return reply(user);
+    if (url.pathname === "/auth/v1/settings")
+      return options.settingsError
+        ? reply({}, 503)
+        : reply({ external: { google: googleEnabled, email: false } });
+    if (url.pathname === "/auth/v1/authorize")
+      return route.fulfill({
+        status: 302,
+        headers: { location: `${base}/?auth_callback=1&code=mock-google-code` },
+      });
+    if (url.pathname === "/auth/v1/token") return reply(session());
+    if (url.pathname === "/auth/v1/user")
+      return reply(options.legacyEmail ? legacyUser : googleUser);
     if (url.pathname === "/auth/v1/logout")
       return route.fulfill({ status: 204 });
-    if (url.pathname === "/auth/v1/signup")
-      return reply({ user, session: null });
-    if (url.pathname === "/auth/v1/recover") return reply({});
     if (url.pathname === "/rest/v1/profiles") {
       if (request.method() === "GET")
         return options.profileError
-          ? reply({ message: "unavailable" }, 503)
+          ? reply({ message: "unavailable" }, 404)
           : reply([{ display_name: savedName }]);
       savedName = data.display_name;
       return route.fulfill({ status: 201 });
@@ -149,55 +159,78 @@ async function fixture(t, options = {}) {
     return route.abort();
   });
   await page.goto(`${base}/#/me`);
-  await page.getByRole("form", { name: "邮箱登录" }).waitFor();
-  return { page, requests, errors };
+  await page.getByRole("button", { name: "使用 Google 登录" }).waitFor();
+  return {
+    page,
+    requests,
+    errors,
+    enableGoogle: () => {
+      googleEnabled = true;
+    },
+  };
 }
 async function login(page) {
-  const form = page.getByRole("form", { name: "邮箱登录" });
-  await form.getByLabel("邮箱", { exact: true }).fill(user.email);
-  await form.getByLabel("密码", { exact: true }).fill("safe-test-password");
-  await form.getByRole("button", { name: "登录账号" }).click();
+  await page.waitForFunction(() => {
+    const b = [...document.querySelectorAll("button")].find((b) =>
+      b.textContent.includes("使用 Google 登录"),
+    );
+    return b && !b.disabled;
+  });
+  await page.getByRole("button", { name: "使用 Google 登录" }).click();
   await page.getByRole("button", { name: "退出登录" }).waitFor();
 }
 
-test("registers by email, validates matching passwords, and requests a PKCE email callback", async (t) => {
+test("offers only Google login with no email registration or password forms", async (t) => {
   const { page, requests, errors } = await fixture(t);
-  await page.getByRole("button", { name: "注册", exact: true }).click();
-  const form = page.getByRole("form", { name: "注册账号" });
-  await form.getByLabel("邮箱", { exact: true }).fill(user.email);
-  await form.getByLabel("密码", { exact: true }).fill("safe-test-password");
-  await form.getByLabel("确认密码", { exact: true }).fill("different-password");
-  await form.getByRole("button", { name: "创建账号" }).click();
-  await page
-    .getByRole("alert")
-    .filter({ hasText: "两次输入的密码不一致" })
-    .waitFor();
-  assert.equal(requests.filter((r) => r.path.endsWith("/signup")).length, 0);
-  await form.getByLabel("确认密码", { exact: true }).fill("safe-test-password");
-  await form.getByRole("button", { name: "创建账号" }).click();
-  await page.getByRole("status").filter({ hasText: "请检查邮箱" }).waitFor();
-  const request = requests.find((r) => r.path.endsWith("/signup"));
-  assert.equal(request.data.email, user.email);
-  assert.ok(request.data.code_challenge);
-  assert.equal(request.query.get("redirect_to"), `${base}/?auth_callback=1`);
-  assert.deepEqual(errors, []);
-});
-
-test("reports invalid credentials and keeps login usable", async (t) => {
-  const { page, errors } = await fixture(t, { invalidLogin: true });
-  await page.getByLabel("邮箱", { exact: true }).fill(user.email);
-  await page.getByLabel("密码", { exact: true }).fill("wrong-password");
-  await page.getByRole("button", { name: "登录账号" }).click();
-  await page.getByRole("alert").waitFor();
-  assert.match(await page.getByRole("alert").innerText(), /邮箱或密码不正确/);
   assert.equal(
-    await page.getByRole("button", { name: "登录账号" }).isEnabled(),
-    true,
+    await page.getByRole("button", { name: "注册", exact: true }).count(),
+    0,
+  );
+  assert.equal(
+    await page.locator('input[type="email"],input[type="password"]').count(),
+    0,
+  );
+  assert.equal(
+    await page.getByRole("button", { name: "忘记密码？" }).count(),
+    0,
+  );
+  for (const width of [375, 1280])
+    for (const theme of ["light", "dark"]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.evaluate(
+        (theme) => document.documentElement.setAttribute("data-theme", theme),
+        theme,
+      );
+      const panel = await page.locator(".account-panel").boundingBox();
+      assert.ok(panel.x >= 0 && panel.x + panel.width <= width + 1);
+    }
+  assert.ok(
+    requests.every(
+      (r) => !["/auth/v1/signup", "/auth/v1/recover"].includes(r.path),
+    ),
   );
   assert.deepEqual(errors, []);
 });
-
-test("restores sessions, saves the own-user profile, and logs out without erasing learning data", async (t) => {
+test("uses Google OAuth with PKCE and returns to the account page", async (t) => {
+  const { page, requests, errors } = await fixture(t);
+  await login(page);
+  const oauth = requests.find((r) => r.path === "/auth/v1/authorize");
+  assert.equal(oauth.query.get("provider"), "google");
+  assert.equal(oauth.query.get("redirect_to"), `${base}/?auth_callback=1`);
+  assert.equal(oauth.query.get("code_challenge_method"), "s256");
+  assert.ok(oauth.query.get("code_challenge"));
+  assert.equal(oauth.query.get("prompt"), "select_account");
+  assert.ok(
+    requests.some(
+      (r) =>
+        r.path === "/auth/v1/token" && r.query.get("grant_type") === "pkce",
+    ),
+  );
+  assert.equal(new URL(page.url()).hash, "#/me");
+  assert.ok(!page.url().includes("code="));
+  assert.deepEqual(errors, []);
+});
+test("restores Google sessions, saves the own-user profile and preserves progress on logout", async (t) => {
   const { page, requests, errors } = await fixture(t);
   await page.evaluate(() =>
     localStorage.setItem(
@@ -234,7 +267,7 @@ test("restores sessions, saves the own-user profile, and logs out without erasin
       .every((r) => r.query.get("id") === `eq.${userId}`),
   );
   await page.getByRole("button", { name: "退出登录" }).click();
-  await page.getByRole("form", { name: "邮箱登录" }).waitFor();
+  await page.getByRole("button", { name: "使用 Google 登录" }).waitFor();
   assert.deepEqual(
     await page.evaluate(
       () =>
@@ -244,11 +277,57 @@ test("restores sessions, saves the own-user profile, and logs out without erasin
     ["library"],
   );
   await page.reload();
-  await page.getByRole("form", { name: "邮箱登录" }).waitFor();
+  await page.getByRole("button", { name: "使用 Google 登录" }).waitFor();
   assert.deepEqual(errors, []);
 });
-
-test("allows a signed-in user to recover from a profile service error", async (t) => {
+test("keeps guests usable while Google is disabled and can retry after it is enabled", async (t) => {
+  const { page, requests, errors, enableGoogle } = await fixture(t, {
+    googleEnabled: false,
+  });
+  await page
+    .getByRole("status")
+    .filter({ hasText: "Google 登录暂未开放" })
+    .waitFor();
+  assert.equal(
+    await page.getByRole("button", { name: "使用 Google 登录" }).isDisabled(),
+    true,
+  );
+  assert.equal(
+    requests.filter((r) => r.path === "/auth/v1/authorize").length,
+    0,
+  );
+  enableGoogle();
+  await page.getByRole("button", { name: "重试连接" }).click();
+  await login(page);
+  assert.deepEqual(errors, []);
+});
+test("clears a canceled OAuth callback and presents Google login again", async (t) => {
+  const { page, errors } = await fixture(t);
+  await page.goto(
+    `${base}/?auth_callback=1#error=access_denied&error_description=User+denied+access`,
+  );
+  await page
+    .getByRole("alert")
+    .filter({ hasText: "Google 登录未完成" })
+    .waitFor();
+  await page.getByRole("button", { name: "使用 Google 登录" }).waitFor();
+  assert.ok(!page.url().includes("error="));
+  assert.deepEqual(errors, []);
+});
+test("signs out legacy email sessions and offers Google login", async (t) => {
+  const { page, requests, errors } = await fixture(t, { legacyEmail: true });
+  await page
+    .getByRole("alert")
+    .filter({ hasText: "本站仅支持 Google 登录" })
+    .waitFor();
+  await page.waitForFunction(
+    () => localStorage.getItem("sb-word-atlas-auth-test-auth-token") === null,
+  );
+  assert.ok(requests.some((r) => r.path === "/auth/v1/logout"));
+  assert.equal(await page.getByRole("button", { name: "退出登录" }).count(), 0);
+  assert.deepEqual(errors, []);
+});
+test("keeps account logout usable when profiles are unavailable", async (t) => {
   const { page, errors } = await fixture(t, { profileError: true });
   await login(page);
   await page
@@ -261,53 +340,19 @@ test("allows a signed-in user to recover from a profile service error", async (t
   );
   assert.deepEqual(errors, []);
 });
-
-test("handles a recovery email callback and updates the password using the recovery session", async (t) => {
-  const { page, requests, errors } = await fixture(t);
-  await page.getByRole("button", { name: "忘记密码？" }).click();
-  const form = page.getByRole("form", { name: "重置密码" });
-  await form.getByLabel("邮箱", { exact: true }).fill(user.email);
-  await form.getByRole("button", { name: "发送重置邮件" }).click();
+test("reports a provider-settings network failure without starting OAuth", async (t) => {
+  const { page, requests, errors } = await fixture(t, { settingsError: true });
   await page
-    .getByRole("status")
-    .filter({ hasText: "如果该邮箱已注册" })
-    .waitFor();
-  const reset = requests.find((r) => r.path.endsWith("/recover"));
-  assert.ok(reset.data.code_challenge);
-  assert.equal(reset.query.get("redirect_to"), `${base}/?auth_callback=1`);
-  await page.goto(`${base}/?auth_callback=1&code=mock-recovery-code`);
-  const dialog = page.getByRole("dialog", { name: "设置新密码" });
-  await dialog.waitFor();
-  await dialog.getByLabel("新密码", { exact: true }).fill("updated-password");
-  await dialog
-    .getByLabel("确认新密码", { exact: true })
-    .fill("different-password");
-  await dialog.getByRole("button", { name: "保存新密码" }).click();
-  await dialog
     .getByRole("alert")
-    .filter({ hasText: "两次输入的密码不一致" })
+    .filter({ hasText: "暂时无法连接登录服务" })
     .waitFor();
-  await dialog
-    .getByLabel("确认新密码", { exact: true })
-    .fill("updated-password");
-  await dialog.getByRole("button", { name: "保存新密码" }).click();
-  await dialog.waitFor({ state: "detached" });
   assert.equal(
-    requests.find((r) => r.path === "/auth/v1/user" && r.method === "PUT").data
-      .password,
-    "updated-password",
+    await page.getByRole("button", { name: "使用 Google 登录" }).isDisabled(),
+    true,
   );
-  assert.ok(!page.url().includes("code="));
-  assert.deepEqual(errors, []);
-});
-
-test("expired email links show a clear error and return to login", async (t) => {
-  const { page, errors } = await fixture(t);
-  await page.goto(
-    `${base}/?auth_callback=1#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid`,
+  assert.equal(
+    requests.filter((r) => r.path === "/auth/v1/authorize").length,
+    0,
   );
-  await page.getByRole("alert").filter({ hasText: "验证链接已失效" }).waitFor();
-  await page.getByRole("form", { name: "邮箱登录" }).waitFor();
-  assert.ok(!page.url().includes("error="));
   assert.deepEqual(errors, []);
 });

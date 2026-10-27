@@ -225,4 +225,4 @@ npm run build       # 生产构建，输出到 dist/
 
 ## 可选账号与 Vercel 部署
 
-「我的」支持 Supabase 邮箱注册、登录、退出、会话保持和密码重置。学习进度仍保存在本机，尚未实现跨设备同步。Vercel Marketplace 集成、公开环境变量和邮件回调设置见 [部署说明](docs/auth-and-vercel.md)。
+「我的」仅支持通过 Supabase 使用 Google 账号登录、退出和会话保持，不提供邮箱注册或密码登录。学习进度仍保存在本机，尚未实现跨设备同步。Vercel Marketplace 集成、公开环境变量和邮件回调设置见 [部署说明](docs/auth-and-vercel.md)。

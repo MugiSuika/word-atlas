@@ -8,25 +8,28 @@ import {
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./client";
 
+function hasGoogleIdentity(session: Session) {
+  const metadata = session.user.app_metadata;
+  return (
+    metadata.provider === "google" ||
+    (Array.isArray(metadata.providers) && metadata.providers.includes("google"))
+  );
+}
+
 interface AuthState {
   session: Session | null;
   loading: boolean;
-  recovery: boolean;
   error: string;
-  finishRecovery: () => void;
 }
 const AuthContext = createContext<AuthState>({
   session: null,
   loading: false,
-  recovery: false,
   error: "",
-  finishRecovery: () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(!!supabase);
-  const [recovery, setRecovery] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
     if (!supabase) return;
@@ -34,14 +37,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let changed = false;
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, next) => {
+    } = supabase.auth.onAuthStateChange((_event, next) => {
       if (!active) return;
       changed = true;
+      if (next && !hasGoogleIdentity(next)) {
+        setSession(null);
+        setLoading(false);
+        setError("本站仅支持 Google 登录，请使用 Google 账号继续。");
+        // SDK callbacks run inside its auth lock; defer sign-out to avoid a deadlock.
+        window.setTimeout(() => {
+          void supabase?.auth.signOut({ scope: "local" });
+        }, 0);
+        return;
+      }
       setSession(next);
       setLoading(false);
       if (next) setError("");
-      if (event === "PASSWORD_RECOVERY") setRecovery(true);
-      if (event === "SIGNED_OUT") setRecovery(false);
       if (next && new URLSearchParams(location.search).has("auth_callback")) {
         const url = new URL(location.href);
         url.searchParams.delete("auth_callback");
@@ -57,7 +68,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then(({ data, error: sessionError }) => {
         if (!active) return;
         if (!changed) {
-          setSession(data.session);
+          setSession(
+            data.session && hasGoogleIdentity(data.session)
+              ? data.session
+              : null,
+          );
           setLoading(false);
         }
         if (sessionError) setError("登录状态无法恢复，请重新登录。");
@@ -68,11 +83,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setError("登录状态无法恢复，请检查网络后重试。");
         }
       });
-    // Failed email callbacks must leave a usable login form without exposing URL contents.
+    // Failed OAuth callbacks must leave Google login usable without exposing URL contents.
     const query = new URLSearchParams(location.search);
     const hash = new URLSearchParams(location.hash.slice(1));
     if (query.has("error") || hash.has("error")) {
-      setError("验证链接已失效，请重新发送验证邮件或重置密码。");
+      setError("Google 登录未完成，请重新尝试登录。");
       const url = new URL(location.href);
       for (const key of [
         "error",
@@ -96,9 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         session,
         loading,
-        recovery,
         error,
-        finishRecovery: () => setRecovery(false),
       }}
     >
       {children}

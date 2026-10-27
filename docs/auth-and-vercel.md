@@ -1,54 +1,69 @@
-# Vercel 与 Supabase 用户认证
+# Google 登录、Supabase 与 Vercel
 
-「我的」提供邮箱注册、登录、退出、密码重置，以及刷新页面后的会话恢复。账号认证使用 Supabase Auth。「我的」可编辑昵称，额外使用一张 `public.profiles` 表。访客可以继续使用词库；学习进度仍保存在本机，**本次没有实现跨设备进度同步**。浏览器不需要 service_role key。
+「我的」只提供 Google OAuth 登录、退出、会话恢复和昵称编辑。邮箱注册、密码登录与密码重置入口已移除；旧的纯邮箱会话会在本机退出。首次 Google 登录由 Supabase 自动建立账号，不需要用户在本站设置密码。访客仍可学习。学习进度保存在本机，尚未实现跨设备同步。
 
-## 通过 Vercel 创建 Supabase 项目
+前端限制不等于后台认证方式已关闭：**生产 Supabase 必须启用 Google，并关闭 Email 提供商**，才能在服务端禁止邮箱注册与密码登录。保留全局“允许新用户注册”，否则首次 Google 登录也会被阻止。现有用户无需删除。
 
-1. 在有权限的 Vercel 账号或团队下创建项目，导入此仓库。框架为 Vite，安装 `npm ci`，构建 `npm run build`，输出 `dist`；根目录的 `vercel.json` 已配置。
-2. 从 Vercel Marketplace 安装 Supabase 集成，将新 Supabase 项目连接到这个 Vercel 项目。选择自己的组织、区域和符合预算的套餐；若提供商要求确认计费，在控制台完成该步骤。
-3. 在 Supabase 的 Connect / Project Settings → API 中找到 Project URL 和 **publishable key**（或旧版 anon key）。在 Vercel 项目 Environment Variables 中设置：
+## 1. 创建 Google OAuth Web 客户端
 
-   ```text
-   VITE_SUPABASE_URL=https://<project-ref>.supabase.co
-   VITE_SUPABASE_PUBLISHABLE_KEY=<public publishable key>
-   ```
+在自己的 Google Cloud 项目中打开 [Google Auth Platform → Clients](https://console.cloud.google.com/auth/clients)，完成应用信息与受众配置，创建类型为 **Web application** 的 OAuth 客户端：
 
-   旧项目可使用 `VITE_SUPABASE_ANON_KEY` 替代 publishable key。构建配置也支持集成自动注入的 `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_ANON_KEY` 及对应的 `NEXT_PUBLIC_` 变量；显式 `VITE_` 配置优先。若集成已注入这些公开值，无需重复填写。**不要**将 `SUPABASE_SERVICE_ROLE_KEY`、`sb_secret_*`、数据库密码或管理令牌映射到 `VITE_*`。这些变量会公开打包到浏览器。
-4. 在 Supabase SQL Editor 执行 `supabase/migrations/20261026000000_profiles.sql`（一次），或用已授权的 Supabase CLI 执行 `supabase db push`。脚本创建唯一一张业务表 `profiles`，引用 `auth.users.id`，启用 RLS，用户只能读取、创建和修改自己的昵称。没有公开用户列表，不存储密码；新用户首次保存昵称时创建记录。
-5. Supabase Authentication → Providers 启用 Email，保留邮箱验证。生产使用请配置 SMTP；内置邮件服务有收件人限制和发送限额。
-6. Authentication → URL Configuration：Site URL 设置为生产 HTTPS 域名；Redirect URLs 加入 `https://<生产域名>/?auth_callback=1`。如果使用 Preview，再逐个加入需要测试的预览域名。PKCE 验证和密码重置邮件应在发起请求的同一个浏览器中打开。
-7. 设置变量后重新部署，因为 Vite 在**构建时**读取变量。根路径部署无需 `ATLAS_BASE`。若使用子路径，邮件回调地址也须包含该路径。
+- Authorized JavaScript origins：`https://word-atlas-gules.vercel.app`
+- Authorized redirect URIs：`https://eteemgopnhkxkgdezpsh.supabase.co/auth/v1/callback`
+- 登录只使用 `openid email profile` 基本身份范围。
 
-未配置公开变量时，网页会说明账号服务暂未开放，学习功能仍可使用；这不代表线上认证已部署成功。
+Client ID 是公开标识；Client Secret 只能填入 Supabase 后台 Google 提供商的安全设置，不可放入 `VITE_*`、源码或聊天。Google 应用处于测试模式时，需将登录者加入测试用户；公开使用前按 Google 控制台完成发布。
 
-## 本地开发与检查
+Google Cloud 的回调是 **Supabase 的 `/auth/v1/callback`**，不是本站 `?auth_callback=1`；两者属于 OAuth 流程的不同阶段。
 
-复制 `.env.example` 到被忽略的 `.env.local`，填入项目公开配置，运行 `npm ci` 和 `npm run dev`。在 Supabase Redirect URLs 中加入 `http://localhost:5188/?auth_callback=1`。Supabase 服务自身仍使用 HTTPS。
+## 2. 设置 Supabase 登录方式
+
+通过 Vercel 的 `word-atlas-users` 资源使用单点登录进入 Supabase 项目 `eteemgopnhkxkgdezpsh`。
+
+1. Authentication → Sign In / Providers → Google：填入 Google Client ID、Client Secret，启用并保存。
+2. 在同一提供商列表中关闭 Email，保存。不配置其他登录提供商。
+3. Authentication → URL Configuration：
+   - Site URL：`https://word-atlas-gules.vercel.app`
+   - Redirect URLs：加入 `https://word-atlas-gules.vercel.app/?auth_callback=1`
+   - 如使用另一个生产别名，再加入 `https://word-atlas-wnnw.vercel.app/?auth_callback=1`。
+4. 需要本地登录时，加入 `http://localhost:5188/?auth_callback=1`；预览地址逐个添加，避免开放整个公共域名的通配符。
+
+页面会检查公开的提供商设置；Google 未配置时，显示“Google 登录暂未开放”，保留本机学习功能，可点击“重试连接”重新检查。后台启用 Google 后无需重新构建前端。
+
+要由自动化修改这些服务端设置，需要可用的 Supabase 管理授权；Vercel 的登录授权和项目 service_role key 不能直接替代 Supabase 管理 API 的凭据。
+
+## 3. 单张资料表
+
+在 Supabase SQL Editor 执行 `supabase/migrations/20261026000000_profiles.sql`，或使用已授权的 Supabase CLI 执行 `supabase db push`。脚本只创建一张业务表 `public.profiles`，引用 `auth.users.id`，启用 RLS，让每个用户只能读取和修改自己的昵称。密码和 OAuth 身份由 Supabase Auth 管理，不存入该表。
+
+## 构建与部署
+
+Vercel 项目是 `wnnw/word-atlas`，已连接 `MugiSuika/word-atlas`。`vercel.json` 使用 Vite、`npm ci`、`npm run build` 和 `dist`。根路径部署不需要 `ATLAS_BASE`。
+
+Vercel Marketplace 已连接 Supabase 免费实例 `word-atlas-users`（新加坡 `sin1`）。构建需要公开的 `VITE_SUPABASE_URL` 与 `VITE_SUPABASE_PUBLISHABLE_KEY`（或旧版 `VITE_SUPABASE_ANON_KEY`）。Vite 也兼容集成注入的公开 `SUPABASE_*` / `NEXT_PUBLIC_SUPABASE_*` 配置。
+
+**禁止**将 service_role、`sb_secret_*`、数据库密码、Google Client Secret、管理访问令牌放入浏览器变量或提交仓库。本地 `.env.local` 和 `.vercel` 已忽略。
+
+生产地址：https://word-atlas-gules.vercel.app
+
+代码分支：`codex/supabase-auth-vercel`。默认分支尚未合并此功能，不应使用旧默认分支覆盖当前生产版本。本项目的 Vercel 团队登录保护已关闭；站点账号认证由 Supabase 承担。
+
+## 验证
 
 ```bash
 npm test
+npm run test:auth
 npm run check:atlas
 npm run build
-npm run test:auth
 ```
 
-`test:auth` 启动独立测试端口，在真实 Chromium 中拦截 Supabase 请求验证交互、错误、会话恢复、退出和密码重置。它不向真实项目注册账号，不替代部署后的真实邮件与认证检查。默认 Chromium 路径为 `/usr/bin/chromium`，可通过 `CHROME_PATH` 指定。其他系统先运行 `npx playwright install chromium` 并设置浏览器路径。
+`test:auth` 使用真实 Chromium 和拦截的 Supabase 响应，验证：仅显示 Google、OAuth PKCE 与回跳、Google 会话恢复、昵称保存、退出保留学习进度、旧邮箱会话退出、Google 未配置与网络失败的处理，以及浅色/深色的手机与桌面布局。不会创建真实邮箱账号，也不替代真实 Google OAuth 检查。默认浏览器为 `/usr/bin/chromium`，可用 `CHROME_PATH` 指定。
 
-## 发布
+真实验证应在 Google/Supabase 配置完成后执行：点击 Google 登录 → Google 授权 → 回到本站「我的」→ 刷新保持会话 → 修改昵称 → 退出。确认 Supabase `/auth/v1/settings` 中 `external.google` 为 true、`external.email` 为 false，并验证不同账号的资料隔离。
 
-在 Vercel 登录授权后，可用 `vercel link` 连接项目，设置公开构建变量，再执行 `vercel --prod`。不要把访问令牌写入仓库。项目内 `.vercelignore` 排除了本地环境文件、缓存、开发数据和文档；运行所需的 `public/atlas` 媒体保留。构建输出约 717 MB，实际发布受所选 Vercel 套餐的部署体积和文件数限制；若平台拒绝，需先选择合适套餐或另行规划媒体存储。
+## 当前外部配置状态
 
-上线后使用真实邮箱检查：注册 → 验证邮件 → 登录 → 刷新保持登录 → 退出 → 发送重置邮件 → 保存新密码 → 用新密码登录，并确认旧密码无法登录。验证完成前不能将真实 Supabase 登录或邮件投递标记为通过。再用两个真实账号检查昵称能保存，并直接请求 REST API 确认账号 A 无法读取或修改账号 B 的资料，匿名请求无法读写任何资料。
-
-## 当前部署记录
-
-- Vercel 项目：`wnnw/word-atlas`，已连接 `MugiSuika/word-atlas` GitHub 仓库。
-- 生产地址： https://word-atlas-gules.vercel.app
-- 部署 ID：`dpl_DauBSxkeaPE96KEM7vRFRLayYErc`，Vercel 返回 `READY`，生产别名已分配。
-- Supabase 资源：`word-atlas-users`，免费套餐，`sin1`（新加坡）；项目 ref：`eteemgopnhkxkgdezpsh`。
-- Supabase 已通过 Vercel Marketplace 连接，公开的 `VITE_SUPABASE_*` 构建变量已自动注入。管理密钥和数据库凭据仅保留在受忽略的本地配置以及 Vercel 环境设置中。
-- 尚未完成：向真实 Supabase 执行 profiles 迁移、配置生产邮件回调，以及线上注册/邮件/资料读写验证。当前云任务的网络策略拒绝新生产域名和 Supabase 域名，所需精确规则已保存到环境配置草稿，尚待应用。不能把 Vercel 的 `READY` 当作这些业务检查已通过。
-
-部署源来自当前工作区，账号功能已提交到 `codex/supabase-auth-vercel` 分支。GitHub 自动部署已经连接，但默认分支尚未包含这些改动；在合并此分支前，请勿从旧分支重新部署覆盖本次生产版本。
-
-本项目的 Vercel 团队登录保护已关闭（`ssoProtection: null`），公开站点使用应用内 Supabase 账号认证。
+- 已通过实际链接验证，默认 Site URL 与显式回跳已指向正确生产站点。
+- Google OAuth 客户端尚未创建；最近检查的 Supabase 状态为 Google 未启用、Email 仍启用。
+- 新前端已只保留 Google；服务端 Google 登录、关闭 Email 及真实 Google 授权验证仍待完成，不能宣称真实 Google 登录已可用。
+- `profiles` 迁移尚未确认在真实项目中执行；其 RLS 已在本地 PostgreSQL 引擎中验证。
