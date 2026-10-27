@@ -35,7 +35,7 @@ function open() {
 export const accountCache: LearningCache = {
   async read(uid) {
     const db = await open();
-    const value = await new Promise<CachedLearning | undefined>(
+    const stored = await new Promise<CachedLearning | undefined>(
       (resolve, reject) => {
         const tx = db.transaction("learning", "readonly"),
           req = tx.objectStore("learning").get(uid);
@@ -43,7 +43,10 @@ export const accountCache: LearningCache = {
         req.onerror = () => reject(new Error("无法读取离线缓存。"));
       },
     );
-    if (!value) return null;
+    if (!stored) return null;
+    // Match the JSON representation used by backups and the database. Older
+    // IndexedDB records may preserve optional fields with explicit undefined.
+    const value = JSON.parse(JSON.stringify(stored)) as CachedLearning;
     if (
       !validLearning(value.data) ||
       !validLearning(value.base) ||
@@ -59,7 +62,7 @@ export const accountCache: LearningCache = {
     const db = await open();
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction("learning", "readwrite");
-      tx.objectStore("learning").put(value, uid);
+      tx.objectStore("learning").put(JSON.parse(JSON.stringify(value)), uid);
       tx.oncomplete = () => resolve();
       tx.onerror = () =>
         reject(new Error("浏览器拒绝保存离线数据，请导出本机副本。"));

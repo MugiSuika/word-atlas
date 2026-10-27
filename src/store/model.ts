@@ -260,9 +260,9 @@ export function validSession(v: unknown): v is ActiveSession | null {
       !["intro", "meaning", "picture", "listen", "spell"].includes(
         step.kind as string,
       ) ||
-      (Object.hasOwn(step, "retry") &&
+      (step.retry !== undefined &&
         (typeof step.retry !== "boolean" || step.kind === "intro")) ||
-      (Object.hasOwn(step, "options") && !ids(step.options))
+      (step.options !== undefined && !ids(step.options))
     )
       return false;
     wordIds.add(step.id);
@@ -278,7 +278,7 @@ export function validSession(v: unknown): v is ActiveSession | null {
   )
     return false;
   const at = v.index as number;
-  if (Object.hasOwn(v, "pending")) {
+  if (v.pending !== undefined) {
     const p = v.pending,
       step = v.steps[at];
     if (
@@ -293,10 +293,10 @@ export function validSession(v: unknown): v is ActiveSession | null {
       return false;
   }
   if (
-    Object.hasOwn(v, "finished") &&
+    v.finished !== undefined &&
     (!num(v.finished, 0, Number.MAX_SAFE_INTEGER) ||
       at !== v.steps.length ||
-      Object.hasOwn(v, "pending"))
+      v.pending !== undefined)
   )
     return false;
   return true;

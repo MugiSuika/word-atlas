@@ -883,3 +883,119 @@ test("switching accounts isolates pending IndexedDB edits and shared profile sta
   assert.equal(cached, "light");
   assert.deepEqual(f.errors, []);
 });
+
+test("A1 browsing does not award progress; first journey answer persists once through home and reload", async (t) => {
+  const f = await fixture(t);
+  f.cloud.learning_data.settings.dailyNew = 1;
+  f.cloud.learning_data.settings.autoplay = false;
+  await login(f.page);
+  await waitSynced(f.page);
+  await f.page.goto(`${base}/#/`);
+  const a1 = f.page.getByRole("button", { name: /^A1 入门，已学 0/ });
+  await a1.click();
+  await f.page.locator(".tile").first().click();
+  const detail = f.page.getByRole("dialog", { name: /词条$/ });
+  await detail.waitFor();
+  await detail.getByText(/浏览卡片不计学习进度/).waitFor();
+  assert.equal(
+    Object.keys(f.cloud.learning_data.datasets["word-atlas-open"]?.cards ?? {})
+      .length,
+    0,
+  );
+  await detail.getByRole("link", { name: "前往今日旅程完成答题" }).click();
+  await f.page.getByRole("button", { name: "开始今天的旅程" }).click();
+  await f.page.getByRole("button", { name: "认识了", exact: true }).waitFor();
+  assert.equal(
+    Object.keys(f.cloud.learning_data.datasets["word-atlas-open"]?.cards ?? {})
+      .length,
+    0,
+  );
+  await f.page.getByRole("button", { name: "认识了", exact: true }).click();
+  const option = f.page.locator(".option").first();
+  await option.waitFor();
+  await option.click();
+  await f.page.getByRole("button", { name: "继续", exact: true }).waitFor();
+  const memoryBefore = await f.page.evaluate(async () => {
+    const { store } = await import("/src/store/store.ts");
+    return structuredClone(store.get().progress);
+  });
+  assert.equal(Object.keys(memoryBefore.cards).length, 1);
+  const day = Object.keys(memoryBefore.days)[0];
+  assert.equal(memoryBefore.days[day].r, 1);
+  assert.equal(memoryBefore.days[day].n, 1);
+  // Re-delivering the same answer while its result is pending cannot award another point.
+  await f.page.evaluate(async () => {
+    const { store } = await import("/src/store/store.ts");
+    const { answer } = await import("/src/store/session.ts");
+    const p = store.get().progress;
+    answer(null, p.session.steps[p.session.index], true, 3, "duplicate");
+  });
+  await f.page.getByRole("button", { name: "暂停并返回" }).click();
+  await f.page.getByRole("button", { name: /^A1 入门，已学 1/ }).waitFor();
+  await f.page.goto(`${base}/#/me`);
+  await waitSynced(f.page);
+  await f.page.reload();
+  await waitSynced(f.page);
+  await f.page.goto(`${base}/#/`);
+  await f.page.getByRole("button", { name: /^A1 入门，已学 1/ }).waitFor();
+  const p = f.cloud.learning_data.datasets["word-atlas-open"];
+  assert.equal(Object.keys(p.cards).length, 1);
+  assert.equal(p.days[day].r, 1);
+  assert.equal(p.days[day].n, 1);
+  assert.deepEqual(f.errors, []);
+});
+
+test("previous IndexedDB snapshots with undefined optional task fields recover on reload", async (t) => {
+  const p = progress("word-atlas-open");
+  p.session = {
+    id: "s123",
+    started: 123,
+    steps: [{ id: "library", kind: "spell" }],
+    index: 0,
+    graded: { library: 3 },
+    newIds: ["library"],
+    reviewIds: [],
+    pending: { correct: true, value: "library" },
+  };
+  const f = await fixture(t, { datasets: { "word-atlas-open": p } });
+  await login(f.page);
+  await waitSynced(f.page);
+  await f.page.evaluate(async (id) => {
+    const open = indexedDB.open("word-atlas-accounts", 1);
+    const db = await new Promise((r, j) => {
+      open.onsuccess = () => r(open.result);
+      open.onerror = j;
+    });
+    await new Promise((r, j) => {
+      const tx = db.transaction("learning", "readwrite"),
+        store = tx.objectStore("learning"),
+        get = store.get(`user:${id}`);
+      get.onsuccess = () => {
+        const row = get.result;
+        for (const data of [row.data, row.base]) {
+          const session = data.datasets["word-atlas-open"].session;
+          session.finished = undefined;
+          session.steps[0].options = undefined;
+        }
+        store.put(row, `user:${id}`);
+      };
+      tx.oncomplete = r;
+      tx.onabort = j;
+    });
+    db.close();
+  }, userId);
+  await f.page.reload();
+  await waitSynced(f.page);
+  assert.equal(
+    await f.page
+      .getByRole("alert")
+      .filter({ hasText: "离线缓存校验失败" })
+      .count(),
+    0,
+  );
+  assert.deepEqual(
+    f.cloud.learning_data.datasets["word-atlas-open"].session,
+    p.session,
+  );
+  assert.deepEqual(f.errors, []);
+});

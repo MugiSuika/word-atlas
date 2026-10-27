@@ -111,3 +111,17 @@ test("v2 settings are validated before conversion, rather than silently dropping
   assert.throws(() => parseBackup(JSON.stringify(v)));
   assert.equal(d.settings.theme, "dark");
 });
+
+test("optional in-memory session fields serialize consistently with the database JSON contract", () => {
+  const d = sample();
+  const s = d.datasets.open.session!;
+  s.finished = undefined;
+  s.steps[0] = { id: "apple", kind: "spell", options: undefined };
+  assert.equal(validLearning(d), true);
+  const restored = parseBackup(serializeBackup(d));
+  assert.deepEqual(restored.data.datasets.open.session, task());
+  assert.equal(
+    Object.hasOwn(restored.data.datasets.open.session!, "finished"),
+    false,
+  );
+});

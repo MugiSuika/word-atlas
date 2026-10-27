@@ -286,6 +286,7 @@ function LevelPath() {
           <i className="lg-seen" /> 已学 <i className="lg-done" /> 已掌握
         </span>
       </div>
+      <p className="muted">点击等级浏览图鉴；在今日旅程中首次作答后计入已学。</p>
       <ol className="route">
         {levels.map((l, i) => {
           const seen = l.seen / Math.max(1, l.total);

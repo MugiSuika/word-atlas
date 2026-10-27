@@ -135,10 +135,9 @@ export function buildSession(
     return {
       id,
       kind,
-      options:
-        kind === "spell"
-          ? undefined
-          : distractors(atlas, ref, kind, seed + salt),
+      ...(kind === "spell"
+        ? {}
+        : { options: distractors(atlas, ref, kind, seed + salt) }),
     };
   };
   // Reviews first while attention is fresh, then new words in small groups:
@@ -274,7 +273,11 @@ export function advance(seconds: number) {
     const next = bumpDay(p, {
       t: Math.max(0, Math.min(90, Math.round(seconds))),
     });
-    return { ...next, session: { ...s, index, pending: undefined, finished } };
+    const session: ActiveSession = { ...s, index };
+    delete session.pending;
+    if (finished !== undefined) session.finished = finished;
+    else delete session.finished;
+    return { ...next, session };
   });
 }
 
