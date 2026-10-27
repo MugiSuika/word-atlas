@@ -55,3 +55,5 @@ npm run build
 
 
 账号数据新版已发布：`dpl_EdUxQG9T4Aw9ZyTNtKpPK6NjrEJS`（READY），功能提交 `709380a5`。生产域名首页返回 200，实际 JavaScript 为 `index-DbofYmT_.js`。最新公开认证设置检查为 Google=true、Email=false、Phone=false，允许首次 Google 身份建立账号。详细的数据迁移、同步、备份、头像权限与验证边界见 [账号数据文档](account-data.md)。
+
+最终修复部署为 `dpl_HAxNLBHiHLYLvrgn2TJwAgtp4z4v`（READY），实际脚本 `index-C6j-6gxt.js` 与本地已测构建完全一致。修复任务缓存的刷新恢复，并补充 A1 图鉴浏览与首次答题计分的说明。
