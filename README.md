@@ -9,7 +9,7 @@
 7,298 个雅思核心词，每个词一幅原创插画、两条原创例句、英美发音和一套刚刚好的复习节奏。<br>
 免费，开源，无需注册，打开网页就能背。
 
-[**打开词光 →**](https://0xlei.tech/words/) &nbsp;·&nbsp; [▶ 看宣传片](docs/assets/launch.mp4) &nbsp;·&nbsp; [下载词库](data/) &nbsp;·&nbsp; [**在 X 关注更新 →**](https://x.com/yangleiocx3) &nbsp;·&nbsp; [English](README.en.md)
+[**打开词光 →**](https://word-atlas.vidu8.online/) &nbsp;·&nbsp; [▶ 看宣传片](docs/assets/launch.mp4) &nbsp;·&nbsp; [下载词库](data/) &nbsp;·&nbsp; [**在 X 关注更新 →**](https://x.com/yangleiocx3) &nbsp;·&nbsp; [English](README.en.md)
 
 ![MIT](https://img.shields.io/badge/code-MIT-1E2640) ![CC BY 4.0](https://img.shields.io/badge/content-CC%20BY%204.0-C4573A) ![words](https://img.shields.io/badge/words-7%2C298-7F9B77) ![FSRS](https://img.shields.io/badge/scheduler-FSRS%206-D9A03A) ![no login](https://img.shields.io/badge/login-not%20required-6F93AE) ![GitHub stars](https://img.shields.io/github/stars/designfuchen/word-atlas?style=flat&color=E8B65A) [![Follow on X](https://img.shields.io/badge/X-@yangleiocx3-111?logo=x&logoColor=white)](https://x.com/yangleiocx3)
 
@@ -60,9 +60,9 @@
 
 | | |
 |---|---|
-| 🇬🇧 英音 | [abandon /əˈbændən/](https://0xlei.tech/words/atlas/audio/uk/abandon.mp3) |
-| 🇺🇸 美音 | [abandon /əˈbændən/](https://0xlei.tech/words/atlas/audio/us/abandon.mp3) |
-| 📖 例句朗读 | [We had to abandon our car in the snow.](https://0xlei.tech/words/atlas/audio/ex/abandon.mp3) |
+| 🇬🇧 英音 | [abandon /əˈbændən/](https://word-atlas.vidu8.online/atlas/audio/uk/abandon.mp3) |
+| 🇺🇸 美音 | [abandon /əˈbændən/](https://word-atlas.vidu8.online/atlas/audio/us/abandon.mp3) |
+| 📖 例句朗读 | [We had to abandon our car in the snow.](https://word-atlas.vidu8.online/atlas/audio/ex/abandon.mp3) |
 
 全部 7,298 个词都有英音、美音和例句朗读，还有 1,011 个重点词的第二条例句也配了朗读。
 
@@ -70,10 +70,10 @@
 
 | | |
 |---|---|
-| 🎙 **开屏配音** | [「欢迎打开雅思大门」](https://0xlei.tech/words/sfx/splash-voice.mp3)：星尘汇聚成“词光”，大门打开 |
-| 🌌 **星图配音** | [「这是你的词汇星图。每学会一个词，就点亮一颗星。」](https://0xlei.tech/words/sfx/voice-galaxy-hello.mp3) |
-| 🎵 **星空音乐** | [一段可无缝循环的原创配乐](https://0xlei.tech/words/sfx/amb-stars.mp3)，默认陪你背词 |
-| 🌧 **6 段环境声** | [雨天图书馆](https://0xlei.tech/words/sfx/amb-rain.mp3) · [清晨海岸](https://0xlei.tech/words/sfx/amb-sea.mp3) · [林间早晨](https://0xlei.tech/words/sfx/amb-forest.mp3) · [夜晚壁炉](https://0xlei.tech/words/sfx/amb-fire.mp3) · [远航船舱](https://0xlei.tech/words/sfx/amb-voyage.mp3) · [安静咖啡馆](https://0xlei.tech/words/sfx/amb-cafe.mp3) |
+| 🎙 **开屏配音** | [「欢迎打开雅思大门」](https://word-atlas.vidu8.online/sfx/splash-voice.mp3)：星尘汇聚成“词光”，大门打开 |
+| 🌌 **星图配音** | [「这是你的词汇星图。每学会一个词，就点亮一颗星。」](https://word-atlas.vidu8.online/sfx/voice-galaxy-hello.mp3) |
+| 🎵 **星空音乐** | [一段可无缝循环的原创配乐](https://word-atlas.vidu8.online/sfx/amb-stars.mp3)，默认陪你背词 |
+| 🌧 **6 段环境声** | [雨天图书馆](https://word-atlas.vidu8.online/sfx/amb-rain.mp3) · [清晨海岸](https://word-atlas.vidu8.online/sfx/amb-sea.mp3) · [林间早晨](https://word-atlas.vidu8.online/sfx/amb-forest.mp3) · [夜晚壁炉](https://word-atlas.vidu8.online/sfx/amb-fire.mp3) · [远航船舱](https://word-atlas.vidu8.online/sfx/amb-voyage.mp3) · [安静咖啡馆](https://word-atlas.vidu8.online/sfx/amb-cafe.mp3) |
 | ✨ **界面音效** | 答对、答错、翻卡、打字、连胜、点亮星星……每个操作都有自己的声音；读单词时背景音会自动压低 |
 
 全部素材都在仓库里：插画在 `public/atlas/img/`，录音在 `public/atlas/audio/`，这两类按 CC BY 4.0 开放；界面声音和配乐在 `public/sfx/`，随应用一起提供。

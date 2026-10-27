@@ -8,7 +8,7 @@
 
 在自己的 Google Cloud 项目中打开 [Google Auth Platform → Clients](https://console.cloud.google.com/auth/clients)，完成应用信息与受众配置，创建类型为 **Web application** 的 OAuth 客户端：
 
-- Authorized JavaScript origins：`https://word-atlas-gules.vercel.app`
+- Authorized JavaScript origins：`https://word-atlas.vidu8.online`
 - Authorized redirect URIs：`https://eteemgopnhkxkgdezpsh.supabase.co/auth/v1/callback`
 - 登录只使用 `openid email profile` 基本身份范围。
 
@@ -23,9 +23,9 @@ Google Cloud 的回调是 **Supabase 的 `/auth/v1/callback`**，不是本站 `?
 1. Authentication → Sign In / Providers → Google：填入 Google Client ID、Client Secret，启用并保存。
 2. 在同一提供商列表中关闭 Email，保存。不配置其他登录提供商。
 3. Authentication → URL Configuration：
-   - Site URL：`https://word-atlas-gules.vercel.app`
-   - Redirect URLs：加入 `https://word-atlas-gules.vercel.app/?auth_callback=1`
-   - 如使用另一个生产别名，再加入 `https://word-atlas-wnnw.vercel.app/?auth_callback=1`。
+   - Site URL：`https://word-atlas.vidu8.online`
+   - Redirect URLs：加入 `https://word-atlas.vidu8.online/?auth_callback=1`
+   - 旧的公开 Vercel 域名会转到新域名，避免 PKCE 登录从一个域名开始、回到另一个域名。
 4. 需要本地登录时，加入 `http://localhost:5188/?auth_callback=1`；预览地址逐个添加，避免开放整个公共域名的通配符。
 
 页面会检查公开的提供商设置；Google 未配置时，显示“Google 登录暂未开放”，保留本机学习功能，可点击“重试连接”重新检查。后台启用 Google 后无需重新构建前端。
@@ -44,7 +44,7 @@ Vercel Marketplace 已连接 Supabase 免费实例 `word-atlas-users`（新加�
 
 **禁止**将 service_role、`sb_secret_*`、数据库密码、Google Client Secret、管理访问令牌放入浏览器变量或提交仓库。本地 `.env.local` 和 `.vercel` 已忽略。
 
-生产地址：https://word-atlas-gules.vercel.app
+生产地址：https://word-atlas.vidu8.online
 
 代码分支：`codex/supabase-auth-vercel`。默认分支尚未合并此功能，不应使用旧默认分支覆盖当前生产版本。本项目的 Vercel 团队登录保护已关闭；站点账号认证由 Supabase 承担。
 
@@ -64,8 +64,14 @@ npm run build
 ## 当前外部配置状态
 
 - 已通过实际链接验证，默认 Site URL 与显式回跳已指向正确生产站点。
-- Google OAuth 客户端尚未创建；最近检查的 Supabase 状态为 Google 未启用、Email 仍启用。
+- 最新生产变量仍指向 Supabase 项目 `eteemgopnhkxkgdezpsh`。重新请求公开设置得到 Google 未启用、Email 仍启用；Google 授权端点返回 HTTP 400，需要核对该项目的提供商配置是否已保存并生效。
 - 新前端已只保留 Google；服务端 Google 登录、关闭 Email 及真实 Google 授权验证仍待完成，不能宣称真实 Google 登录已可用。
 - 已通过真实 REST 元数据请求确认 `profiles` 表及 `id`、`display_name`、`updated_at` 字段存在。RLS 已在本地 PostgreSQL 引擎中验证；不同真实账号的权限隔离仍待 Google 登录启用后验证。
 
-Google-only 页面已发布到生产，部署 ID：`dpl_4jior2qvjUSQzwPJ9tgUgC11rvtD`，Vercel 状态 `READY`，生产 HTTP 200。已核对线上 JavaScript 与本地通过测试的构建完全一致，包含 Google 入口且不含旧的邮箱注册、重置密码按钮文案。24 项单元测试与 8 项模拟认证浏览器测试通过；真实 Google OAuth 仍未配置和验证。
+Google-only 页面已发布到生产，功能部署 ID：`dpl_4jior2qvjUSQzwPJ9tgUgC11rvtD`，该部署已验证 Vercel 状态 `READY`、旧生产地址 HTTP 200。已核对线上 JavaScript 与本地通过测试的构建完全一致，包含 Google 入口且不含旧的邮箱注册、重置密码按钮文案。24 项单元测试与 8 项模拟认证浏览器测试通过；真实 Google OAuth 仍未配置和验证。
+
+## 当前生产域名
+
+`https://word-atlas.vidu8.online/` 已在 Vercel 项目 `word-atlas` 中绑定并通过域名验证。页面 canonical、Open Graph / Twitter 分享地址和文档使用该域名。`vercel.json` 将旧的两个公开 Vercel 主机重定向到该域名，保留路径与查询参数。Google Cloud 的授权回调仍为 Supabase 的 `/auth/v1/callback`，不随网站域名变更。
+
+当前云任务的 HTTP 代理拒绝新域名，所需精确域名规则已保存到环境配置草稿，须应用后才能从本任务完成新域名 HTTPS 与实际 Google 登录的完整验证。

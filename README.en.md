@@ -7,7 +7,7 @@
 **One word, one picture. Light up your IELTS vocabulary.**<br>
 7,298 core words · 14,596 original example sentences · 7,298 illustrations · UK & US audio · FSRS spaced repetition
 
-[**Open the app →**](https://0xlei.tech/words/) &nbsp;·&nbsp; [▶ Launch film](docs/assets/launch.mp4) &nbsp;·&nbsp; [Download the dataset](data/) &nbsp;·&nbsp; [**Follow on X →**](https://x.com/yangleiocx3) &nbsp;·&nbsp; [中文](README.md)
+[**Open the app →**](https://word-atlas.vidu8.online/) &nbsp;·&nbsp; [▶ Launch film](docs/assets/launch.mp4) &nbsp;·&nbsp; [Download the dataset](data/) &nbsp;·&nbsp; [**Follow on X →**](https://x.com/yangleiocx3) &nbsp;·&nbsp; [中文](README.md)
 
 <a href="docs/assets/launch.mp4"><img src="docs/assets/launch-preview.webp" alt="Word Atlas launch film highlights" width="100%"></a>
 
