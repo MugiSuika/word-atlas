@@ -89,7 +89,12 @@ async function fixture(t, options = {}) {
     app_metadata: { provider: "email", providers: ["email"] },
   };
   await context.addInitScript(
-    ({ legacy }) => {
+    ({ legacy, withoutTimeout }) => {
+      if (withoutTimeout)
+        Object.defineProperty(AbortSignal, "timeout", {
+          value: undefined,
+          configurable: true,
+        });
       localStorage.setItem(
         "word-atlas:settings",
         JSON.stringify({
@@ -105,9 +110,11 @@ async function fixture(t, options = {}) {
           JSON.stringify(legacy),
         );
     },
-    { legacy: options.legacyEmail ? session(legacyUser) : null },
+    {
+      legacy: options.legacyEmail ? session(legacyUser) : null,
+      withoutTimeout: !!options.withoutTimeout,
+    },
   );
-  let googleEnabled = options.googleEnabled !== false;
   let savedName = "词光学员";
   const requests = [],
     errors = [];
@@ -133,10 +140,7 @@ async function fixture(t, options = {}) {
           "access-control-expose-headers": "X-Supabase-Api-Version",
         },
       });
-    if (url.pathname === "/auth/v1/settings")
-      return options.settingsError
-        ? reply({}, 503)
-        : reply({ external: { google: googleEnabled, email: false } });
+    if (url.pathname === "/auth/v1/settings") return reply({}, 503);
     if (url.pathname === "/auth/v1/authorize")
       return route.fulfill({
         status: 302,
@@ -164,9 +168,6 @@ async function fixture(t, options = {}) {
     page,
     requests,
     errors,
-    enableGoogle: () => {
-      googleEnabled = true;
-    },
   };
 }
 async function login(page) {
@@ -280,25 +281,18 @@ test("restores Google sessions, saves the own-user profile and preserves progres
   await page.getByRole("button", { name: "使用 Google 登录" }).waitFor();
   assert.deepEqual(errors, []);
 });
-test("keeps guests usable while Google is disabled and can retry after it is enabled", async (t) => {
-  const { page, requests, errors, enableGoogle } = await fixture(t, {
-    googleEnabled: false,
-  });
-  await page
-    .getByRole("status")
-    .filter({ hasText: "Google 登录暂未开放" })
-    .waitFor();
+test("starts OAuth when provider settings are unreachable and AbortSignal.timeout is unavailable", async (t) => {
+  const { page, requests, errors } = await fixture(t, { withoutTimeout: true });
   assert.equal(
-    await page.getByRole("button", { name: "使用 Google 登录" }).isDisabled(),
+    await page.getByRole("button", { name: "使用 Google 登录" }).isEnabled(),
     true,
   );
+  await login(page);
   assert.equal(
-    requests.filter((r) => r.path === "/auth/v1/authorize").length,
+    requests.filter((r) => r.path === "/auth/v1/settings").length,
     0,
   );
-  enableGoogle();
-  await page.getByRole("button", { name: "重试连接" }).click();
-  await login(page);
+  assert.ok(requests.some((r) => r.path === "/auth/v1/authorize"));
   assert.deepEqual(errors, []);
 });
 test("clears a canceled OAuth callback and presents Google login again", async (t) => {
@@ -337,22 +331,6 @@ test("keeps account logout usable when profiles are unavailable", async (t) => {
   assert.equal(
     await page.getByRole("button", { name: "退出登录" }).isEnabled(),
     true,
-  );
-  assert.deepEqual(errors, []);
-});
-test("reports a provider-settings network failure without starting OAuth", async (t) => {
-  const { page, requests, errors } = await fixture(t, { settingsError: true });
-  await page
-    .getByRole("alert")
-    .filter({ hasText: "暂时无法连接登录服务" })
-    .waitFor();
-  assert.equal(
-    await page.getByRole("button", { name: "使用 Google 登录" }).isDisabled(),
-    true,
-  );
-  assert.equal(
-    requests.filter((r) => r.path === "/auth/v1/authorize").length,
-    0,
   );
   assert.deepEqual(errors, []);
 });

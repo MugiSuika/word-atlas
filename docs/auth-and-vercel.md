@@ -28,7 +28,7 @@ Google Cloud 的回调是 **Supabase 的 `/auth/v1/callback`**，不是本站 `?
    - 旧的公开 Vercel 域名会转到新域名，避免 PKCE 登录从一个域名开始、回到另一个域名。
 4. 需要本地登录时，加入 `http://localhost:5188/?auth_callback=1`；预览地址逐个添加，避免开放整个公共域名的通配符。
 
-页面会检查公开的提供商设置；Google 未配置时，显示“Google 登录暂未开放”，保留本机学习功能，可点击“重试连接”重新检查。后台启用 Google 后无需重新构建前端。
+Google 按钮直接发起标准 OAuth 授权，不依赖额外的 `/auth/v1/settings` 检测请求，不会因检测网络失败或浏览器缺少 `AbortSignal.timeout` 而锁死按钮。Supabase 后台仍必须启用 Google；后台启用后无需重新构建前端。
 
 要由自动化修改这些服务端设置，需要可用的 Supabase 管理授权；Vercel 的登录授权和项目 service_role key 不能直接替代 Supabase 管理 API 的凭据。
 
@@ -57,7 +57,7 @@ npm run check:atlas
 npm run build
 ```
 
-`test:auth` 使用真实 Chromium 和拦截的 Supabase 响应，验证：仅显示 Google、OAuth PKCE 与回跳、Google 会话恢复、昵称保存、退出保留学习进度、旧邮箱会话退出、Google 未配置与网络失败的处理，以及浅色/深色的手机与桌面布局。不会创建真实邮箱账号，也不替代真实 Google OAuth 检查。默认浏览器为 `/usr/bin/chromium`，可用 `CHROME_PATH` 指定。
+`test:auth` 使用真实 Chromium 和拦截的 Supabase 响应，验证：仅显示 Google、OAuth PKCE 与回跳、Google 会话恢复、昵称保存、退出保留学习进度、旧邮箱会话退出、提供商检测不可达和浏览器缺少 `AbortSignal.timeout` 时仍能发起授权，以及浅色/深色的手机与桌面布局。不会创建真实邮箱账号，也不替代真实 Google OAuth 检查。默认浏览器为 `/usr/bin/chromium`，可用 `CHROME_PATH` 指定。
 
 真实验证应在 Google/Supabase 配置完成后执行：点击 Google 登录 → Google 授权 → 回到本站「我的」→ 刷新保持会话 → 修改昵称 → 退出。确认 Supabase `/auth/v1/settings` 中 `external.google` 为 true、`external.email` 为 false，并验证不同账号的资料隔离。
 

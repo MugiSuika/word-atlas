@@ -1,6 +1,6 @@
 import { LogIn, LogOut, Mail, UserRound } from "lucide-react";
-import { useEffect, useState } from "react";
-import { supabase, authRedirect, googleLoginAvailable } from "./client";
+import { useState } from "react";
+import { supabase, authRedirect } from "./client";
 import { authMessage } from "./config";
 import { useAuth } from "./AuthProvider";
 import { Profile } from "./Profile";
@@ -10,32 +10,8 @@ export function Account() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [googleEnabled, setGoogleEnabled] = useState<boolean | null>(null);
-  const [retry, setRetry] = useState(0);
-
-  useEffect(() => {
-    if (!supabase || session || loading) return;
-    let active = true;
-    setGoogleEnabled(null);
-    setError("");
-    googleLoginAvailable().then(
-      (enabled) => {
-        if (active) setGoogleEnabled(enabled);
-      },
-      () => {
-        if (active) {
-          setGoogleEnabled(false);
-          setError("暂时无法连接登录服务，请检查网络后重试。");
-        }
-      },
-    );
-    return () => {
-      active = false;
-    };
-  }, [session, loading, retry]);
-
   const signIn = async () => {
-    if (!supabase || busy || !googleEnabled) return;
+    if (!supabase || busy) return;
     setBusy(true);
     setError("");
     setNotice("");
@@ -112,34 +88,11 @@ export function Account() {
         </div>
       ) : (
         <div className="account-google">
-          <button
-            className="btn btn-primary"
-            onClick={signIn}
-            disabled={busy || googleEnabled !== true}
-          >
+          <button className="btn btn-primary" onClick={signIn} disabled={busy}>
             <LogIn size={18} />
             {busy ? "正在前往 Google…" : "使用 Google 登录"}
           </button>
-          {googleEnabled === null ? (
-            <p role="status" className="muted">
-              正在连接登录服务…
-            </p>
-          ) : googleEnabled === false ? (
-            <>
-              <p role="status" className="muted">
-                Google 登录暂未开放，你可以继续使用本机学习功能。
-              </p>
-              <button
-                className="btn btn-ghost"
-                onClick={() => setRetry((n) => n + 1)}
-                disabled={busy}
-              >
-                重试连接
-              </button>
-            </>
-          ) : (
-            <p className="muted">首次使用 Google 登录时会自动建立账号。</p>
-          )}
+          <p className="muted">首次使用 Google 登录时会自动建立账号。</p>
         </div>
       )}
       {(error || sessionError) && (
