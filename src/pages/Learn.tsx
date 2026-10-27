@@ -116,7 +116,7 @@ function Runner({ session }: { session: ActiveSession }) {
       </header>
       <main className="learn-stage" key={`${session.id}-${session.index}`}>
         {step.kind === "intro" ? (
-          <Intro step={step} />
+          <Intro step={step} session={session} />
         ) : (
           <Quiz step={step as Step & { kind: QuizKind }} session={session} />
         )}
@@ -130,11 +130,27 @@ function useStepTimer() {
   return () => (performance.now() - t.current) / 1000;
 }
 
-function Intro({ step }: { step: Step }) {
+function Intro({ step, session }: { step: Step; session: ActiveSession }) {
   const atlas = useAtlas();
   const { entry } = useEntry(step.id);
   const settings = useStore((s) => s.settings);
   const elapsed = useStepTimer();
+  let groupStart = session.index,
+    groupEnd = session.index + 1;
+  while (groupStart > 0 && session.steps[groupStart - 1].kind === "intro")
+    groupStart--;
+  while (
+    groupEnd < session.steps.length &&
+    session.steps[groupEnd].kind === "intro"
+  )
+    groupEnd++;
+  const nextStep = session.steps[session.index + 1];
+  const action =
+    nextStep?.kind === "intro"
+      ? "下一张初见卡"
+      : nextStep
+        ? "开始答题"
+        : "查看本轮结果";
   useEffect(() => {
     if (entry && settings.autoplay)
       void play(atlas.audio(entry, settings.accent), entry.w, settings.accent);
@@ -149,12 +165,21 @@ function Intro({ step }: { step: Step }) {
   return (
     <div className="intro">
       <p className="stage-label">
-        <span className="dot dot-new" /> 初次见面
+        <span className="dot dot-new" /> 初次见面 ·{" "}
+        {session.index - groupStart + 1}/{groupEnd - groupStart}
       </p>
       <EntryView entry={entry} mode="intro" />
       <footer className="learn-actions">
-        <button className="btn btn-primary btn-xl" onClick={next} autoFocus>
-          认识了 <ArrowRight size={20} />
+        <p className="learn-progress-note" id="learn-progress-note">
+          初见只保存任务位置；完成后面的首次答题，才增加“已学”和“今日答题”。
+        </p>
+        <button
+          className="btn btn-primary btn-xl"
+          onClick={next}
+          autoFocus
+          aria-describedby="learn-progress-note"
+        >
+          {action} <ArrowRight size={20} />
         </button>
         <span className="hint-keys">
           <kbd>Enter</kbd> 继续

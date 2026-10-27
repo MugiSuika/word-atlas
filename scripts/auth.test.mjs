@@ -904,13 +904,17 @@ test("A1 browsing does not award progress; first journey answer persists once th
   );
   await detail.getByRole("link", { name: "前往今日旅程完成答题" }).click();
   await f.page.getByRole("button", { name: "开始今天的旅程" }).click();
-  await f.page.getByRole("button", { name: "认识了", exact: true }).waitFor();
+  await f.page
+    .getByRole("button", { name: /下一张初见卡|开始答题/, exact: true })
+    .waitFor();
   assert.equal(
     Object.keys(f.cloud.learning_data.datasets["word-atlas-open"]?.cards ?? {})
       .length,
     0,
   );
-  await f.page.getByRole("button", { name: "认识了", exact: true }).click();
+  await f.page
+    .getByRole("button", { name: /下一张初见卡|开始答题/, exact: true })
+    .click();
   const option = f.page.locator(".option").first();
   await option.waitFor();
   await option.click();
@@ -996,6 +1000,144 @@ test("previous IndexedDB snapshots with undefined optional task fields recover o
   assert.deepEqual(
     f.cloud.learning_data.datasets["word-atlas-open"].session,
     p.session,
+  );
+  assert.deepEqual(f.errors, []);
+});
+
+test("intro-only activity syncs position with zero stats; the first answer persists before completing a group", async (t) => {
+  const f = await fixture(t);
+  f.cloud.learning_data.settings.autoplay = false;
+  await login(f.page);
+  await waitSynced(f.page);
+  await f.page.goto(`${base}/#/`);
+  await f.page.getByRole("button", { name: "开始今天的旅程" }).click();
+  await f.page.getByText("初次见面 · 1/5", { exact: true }).waitFor();
+  await f.page
+    .getByRole("button", { name: "下一张初见卡", exact: true })
+    .click();
+  await f.page.getByText("初次见面 · 2/5", { exact: true }).waitFor();
+  await f.page.screenshot({
+    path: "/workspace/.cloud-setup/intro-position-explanation.png",
+  });
+  await f.page.getByRole("button", { name: "暂停并返回" }).click();
+  await f.page.goto(`${base}/#/me`);
+  await waitSynced(f.page);
+  const snapshot = () => f.cloud.learning_data.datasets["word-atlas-open"];
+  assert.equal(snapshot().session.index, 1);
+  assert.equal(Object.keys(snapshot().cards).length, 0);
+  assert.equal(Object.keys(snapshot().session.graded).length, 0);
+  assert.equal(
+    Object.values(snapshot().days).reduce((n, d) => n + d.r, 0),
+    0,
+  );
+  assert.equal(
+    await f.page.locator(".stat-strip > div").nth(1).locator("dd").innerText(),
+    "0",
+  );
+  await f.page.getByRole("region", { name: "本轮学习提示" }).waitFor();
+  await f.page.reload();
+  await waitSynced(f.page);
+  assert.equal(snapshot().session.index, 1);
+  await f.page.getByRole("link", { name: "继续本轮学习", exact: true }).click();
+  await f.page.getByText("初次见面 · 2/5", { exact: true }).waitFor();
+  for (let i = 0; i < 3; i++)
+    await f.page
+      .getByRole("button", { name: "下一张初见卡", exact: true })
+      .click();
+  await f.page.getByText("初次见面 · 5/5", { exact: true }).waitFor();
+  assert.equal(Object.keys(snapshot().cards).length, 0);
+  await f.page.getByRole("button", { name: "开始答题", exact: true }).click();
+  const word = await f.page.evaluate(async () => {
+    const { store } = await import("/src/store/store.ts");
+    const s = store.get().progress.session;
+    return s.steps[s.index].id;
+  });
+  await f.page.locator(`[data-option="${word}"]`).click();
+  await f.page.getByRole("button", { name: "继续", exact: true }).waitFor();
+  await f.page.getByRole("button", { name: "暂停并返回" }).click();
+  await f.page.goto(`${base}/#/me`);
+  await waitSynced(f.page);
+  assert.equal(Object.keys(snapshot().cards).length, 1);
+  assert.equal(snapshot().session.finished, undefined);
+  assert.equal(snapshot().session.index, 5);
+  assert.equal(
+    Object.values(snapshot().days).reduce((n, d) => n + d.r, 0),
+    1,
+  );
+  assert.equal(
+    await f.page.locator(".stat-strip > div").nth(1).locator("dd").innerText(),
+    "1",
+  );
+  assert.equal(
+    await f.page.getByRole("region", { name: "本轮学习提示" }).count(),
+    0,
+  );
+  await f.page.reload();
+  await waitSynced(f.page);
+  assert.equal(
+    await f.page.locator(".stat-strip > div").nth(1).locator("dd").innerText(),
+    "1",
+  );
+  await f.page.goto(`${base}/#/`);
+  await f.page.getByRole("button", { name: "继续旅程", exact: true }).click();
+  await f.page.getByRole("button", { name: "继续", exact: true }).click();
+  await f.page.getByRole("button", { name: "暂停并返回" }).click();
+  await f.page.goto(`${base}/#/me`);
+  await waitSynced(f.page);
+  assert.equal(snapshot().session.index, 6);
+  assert.equal(Object.keys(snapshot().cards).length, 1);
+  assert.equal(
+    Object.values(snapshot().days).reduce((n, d) => n + d.r, 0),
+    1,
+  );
+  assert.deepEqual(f.errors, []);
+});
+
+test("a ten-word journey completes both intro groups and saves ten first answers once", async (t) => {
+  const f = await fixture(t);
+  f.cloud.learning_data.settings.autoplay = false;
+  await login(f.page);
+  await waitSynced(f.page);
+  await f.page.goto(`${base}/#/`);
+  await f.page.getByRole("button", { name: "开始今天的旅程" }).click();
+  await f.page
+    .getByRole("button", { name: "下一张初见卡", exact: true })
+    .waitFor();
+  for (let i = 0; i < 35; i++) {
+    const s = await f.page.evaluate(async () => {
+      const { store } = await import("/src/store/store.ts");
+      return structuredClone(store.get().progress.session);
+    });
+    if (s.finished) break;
+    const step = s.steps[s.index];
+    if (step.kind === "intro")
+      await f.page
+        .getByRole("button", { name: /下一张初见卡|开始答题/, exact: true })
+        .click();
+    else if (s.pending)
+      await f.page.getByRole("button", { name: "继续", exact: true }).click();
+    else await f.page.locator(`[data-option="${step.id}"]`).click();
+  }
+  await f.page.getByText("这一程结束了", { exact: true }).waitFor();
+  await f.page.getByRole("button", { name: "完成", exact: true }).click();
+  await f.page.goto(`${base}/#/me`);
+  await waitSynced(f.page);
+  const p = f.cloud.learning_data.datasets["word-atlas-open"];
+  assert.equal(Object.keys(p.cards).length, 10);
+  assert.equal(
+    Object.values(p.days).reduce((n, d) => n + d.r, 0),
+    10,
+  );
+  assert.equal(
+    Object.values(p.days).reduce((n, d) => n + d.n, 0),
+    10,
+  );
+  assert.equal(p.session, null);
+  await f.page.reload();
+  await waitSynced(f.page);
+  assert.equal(
+    await f.page.locator(".stat-strip > div").nth(1).locator("dd").innerText(),
+    "10",
   );
   assert.deepEqual(f.errors, []);
 });

@@ -4166,3 +4166,8 @@ a:hover .mark-needle,
 
 .entry-learning-hint { padding: 10px 14px; margin: 16px 0; border-radius: 12px; background: var(--paper-2); color: var(--ink-2); font-size: 13px; }
 .entry-learning-hint a { color: var(--terra-ink); text-decoration: underline; text-underline-offset: 3px; }
+
+.learn-actions { flex-wrap: wrap; }
+.learn-progress-note { flex-basis: 100%; order: -2; color: var(--ink-2); font-size: 12px; margin: 0; }
+.learning-notice { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 20px; margin-bottom: 20px; }
+.learning-notice p { flex: 1 1 260px; color: var(--ink-2); font-size: 14px; }

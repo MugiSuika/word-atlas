@@ -55,6 +55,20 @@ export function Me({ privateAvailable }: { privateAvailable: boolean }) {
 
       <Account />
 
+      {progress.session &&
+        !progress.session.finished &&
+        progress.session.newIds.length > 0 &&
+        Object.keys(progress.session.graded).length === 0 && (
+          <section className="panel learning-notice" aria-label="本轮学习提示">
+            <p>
+              本轮还没有作答。初见卡片只保存任务位置，接下来的首次答题才计入已学进度，不需要完成整轮才能保存。
+            </p>
+            <a className="btn btn-ghost" href="#/learn">
+              继续本轮学习
+            </a>
+          </section>
+        )}
+
       <section className="stat-strip">
         <div>
           <dt>连续学习</dt>
