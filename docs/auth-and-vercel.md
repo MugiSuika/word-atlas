@@ -79,3 +79,5 @@ Google-only 页面已发布到生产，功能部署 ID：`dpl_4jior2qvjUSQzwPJ9t
 新域名版本部署 ID：`dpl_3LT9dWEkDvpzLcbC4v16LusTyWr5`，Vercel 返回 `READY`，生产域名为 `word-atlas.vidu8.online`。Vercel DNS 检查为 `configuredBy=CNAME`、`misconfigured=false`。旧公开域名 `word-atlas-gules.vercel.app` 另已设置 Vercel 域名级 308 跳转，实际请求确认路径和查询参数完整保留。
 
 截图确认 Google Cloud Web 客户端已创建，JavaScript 来源和 Supabase 回调 URI 均正确；Supabase Site URL / Redirect URL 也填写正确。但对最新生产变量指向的项目做无缓存请求，仍读到 `external.google=false`、`external.email=true`，实际 Google 授权请求返回 HTTP 400：`Unsupported provider: provider is not enabled`。下一步应检查 Supabase Google 提供商中的 Client ID / Client Secret、启用开关与保存状态，而不是重新创建 Google 客户端或更改这四个正确的 URL。
+
+登录按钮修复已上线：`dpl_7BWQoMgQGCyMPQ5gd3Yi4b8SFMEr`，状态 `READY`，生产地址 `https://word-atlas.vidu8.online`。移除了会因额外检测请求失败而禁用按钮的逻辑，改为直接发起 Google OAuth。新增回归用例覆盖检测接口不可达、浏览器缺少 `AbortSignal.timeout` 的情况；24 项单元测试、7 项浏览器测试、词库校验和构建通过。发布后的真实提供商检查仍为 Google 关闭、Email 开启，实际 Google 授权仍返回 HTTP 400 `Unsupported provider: provider is not enabled`，需完成 Supabase Google 提供商配置。未将按钮修复宣称为真实 Google 登录已验证成功。
