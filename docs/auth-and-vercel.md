@@ -66,4 +66,6 @@ npm run build
 - 已通过实际链接验证，默认 Site URL 与显式回跳已指向正确生产站点。
 - Google OAuth 客户端尚未创建；最近检查的 Supabase 状态为 Google 未启用、Email 仍启用。
 - 新前端已只保留 Google；服务端 Google 登录、关闭 Email 及真实 Google 授权验证仍待完成，不能宣称真实 Google 登录已可用。
-- `profiles` 迁移尚未确认在真实项目中执行；其 RLS 已在本地 PostgreSQL 引擎中验证。
+- 已通过真实 REST 元数据请求确认 `profiles` 表及 `id`、`display_name`、`updated_at` 字段存在。RLS 已在本地 PostgreSQL 引擎中验证；不同真实账号的权限隔离仍待 Google 登录启用后验证。
+
+Google-only 页面已发布到生产，部署 ID：`dpl_4jior2qvjUSQzwPJ9tgUgC11rvtD`，Vercel 状态 `READY`，生产 HTTP 200。已核对线上 JavaScript 与本地通过测试的构建完全一致，包含 Google 入口且不含旧的邮箱注册、重置密码按钮文案。24 项单元测试与 8 项模拟认证浏览器测试通过；真实 Google OAuth 仍未配置和验证。
