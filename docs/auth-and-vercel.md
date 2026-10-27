@@ -52,3 +52,6 @@ npm run build
 `test:auth` 使用真实 Chromium 与模拟 Supabase 响应，检查 Google-only 入口、OAuth PKCE 回跳、会话恢复、昵称保存、退出与旧邮箱会话清理、提供商预检不可达和旧浏览器能力回退、浅深主题手机/桌面布局。默认 `/usr/bin/chromium`，支持 `CHROME_PATH`。不创建真实认证用户，不替代生产 OAuth 验证。
 
 `test:db` 在本地 PostgreSQL 引擎中验证迁移、版本冲突、隔离和全量替换；详细边界与发布前的真实账号检查见 [账号数据后端文档](account-data.md)。
+
+
+账号数据新版已发布：`dpl_EdUxQG9T4Aw9ZyTNtKpPK6NjrEJS`（READY），功能提交 `709380a5`。生产域名首页返回 200，实际 JavaScript 为 `index-DbofYmT_.js`。最新公开认证设置检查为 Google=true、Email=false、Phone=false，允许首次 Google 身份建立账号。详细的数据迁移、同步、备份、头像权限与验证边界见 [账号数据文档](account-data.md)。
