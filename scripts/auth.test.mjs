@@ -248,7 +248,7 @@ async function fixture(t, options = {}) {
     return route.abort();
   });
   await page.goto(`${base}/#/me`);
-  await page.getByRole("button", { name: "使用 Google 登录" }).waitFor();
+  await page.getByRole("button", { name: "使用 Google 继续" }).waitFor();
   return {
     page,
     requests,
@@ -283,11 +283,11 @@ async function fixture(t, options = {}) {
 async function login(page) {
   await page.waitForFunction(() => {
     const b = [...document.querySelectorAll("button")].find((b) =>
-      b.textContent.includes("使用 Google 登录"),
+      b.textContent.includes("使用 Google 继续"),
     );
     return b && !b.disabled;
   });
-  await page.getByRole("button", { name: "使用 Google 登录" }).click();
+  await page.getByRole("button", { name: "使用 Google 继续" }).click();
   await page.getByRole("button", { name: "退出登录" }).waitFor();
 }
 
@@ -381,7 +381,7 @@ test("restores Google sessions, saves the own-user profile and preserves progres
       .every((r) => !r.data || !Object.hasOwn(r.data, "id")),
   );
   await page.getByRole("button", { name: "退出登录" }).click();
-  await page.getByRole("button", { name: "使用 Google 登录" }).waitFor();
+  await page.getByRole("button", { name: "使用 Google 继续" }).waitFor();
   assert.deepEqual(
     await page.evaluate(
       () =>
@@ -391,13 +391,13 @@ test("restores Google sessions, saves the own-user profile and preserves progres
     ["library"],
   );
   await page.reload();
-  await page.getByRole("button", { name: "使用 Google 登录" }).waitFor();
+  await page.getByRole("button", { name: "使用 Google 继续" }).waitFor();
   assert.deepEqual(errors, []);
 });
 test("starts OAuth when provider settings are unreachable and AbortSignal.timeout is unavailable", async (t) => {
   const { page, requests, errors } = await fixture(t, { withoutTimeout: true });
   assert.equal(
-    await page.getByRole("button", { name: "使用 Google 登录" }).isEnabled(),
+    await page.getByRole("button", { name: "使用 Google 继续" }).isEnabled(),
     true,
   );
   await login(page);
@@ -417,7 +417,7 @@ test("clears a canceled OAuth callback and presents Google login again", async (
     .getByRole("alert")
     .filter({ hasText: "Google 登录未完成" })
     .waitFor();
-  await page.getByRole("button", { name: "使用 Google 登录" }).waitFor();
+  await page.getByRole("button", { name: "使用 Google 继续" }).waitFor();
   assert.ok(!page.url().includes("error="));
   assert.deepEqual(errors, []);
 });
@@ -493,7 +493,7 @@ test("first login asks before migrating all guest datasets and leaves guest orig
     "two",
   ]);
   await f.page.getByRole("button", { name: "退出登录", exact: true }).click();
-  await f.page.getByRole("button", { name: "使用 Google 登录" }).waitFor();
+  await f.page.getByRole("button", { name: "使用 Google 继续" }).waitFor();
   assert.deepEqual(
     await f.page.evaluate(
       () => JSON.parse(localStorage.getItem("word-atlas:v2:one")).bookmarks,

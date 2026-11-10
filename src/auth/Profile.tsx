@@ -1,19 +1,21 @@
+import type { ReactNode } from "react";
 import { Avatar } from "./Avatar";
 import { useAccountData } from "./AccountDataProvider";
-export function Profile() {
-  const { profile, openEditor, uid } = useAccountData();
+import { useAuth } from "./AuthProvider";
+
+export function Profile({ children }: { children?: ReactNode }) {
+  const { profile, uid } = useAccountData();
+  const { session } = useAuth();
+  const email = session?.user.email;
   return (
     <div className="account-profile-summary">
       <Avatar key={uid ?? "guest"} large />
-      <div>
-        <strong>{profile?.display_name || "Google 账号"}</strong>
-        <button
-          className="btn btn-ghost"
-          disabled={!profile}
-          onClick={openEditor}
-        >
-          编辑资料
-        </button>
+      <div className="account-profile-copy">
+        <strong className="account-name">
+          {profile?.display_name || "Google 账号"}
+        </strong>
+        {email ? <p className="account-email">{email}</p> : null}
+        {children}
       </div>
     </div>
   );
