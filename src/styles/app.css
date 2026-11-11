@@ -1504,9 +1504,46 @@ code {
     font-size: 32px;
   }
 }
+.journey-kicker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
 .journey .eyebrow-light {
   color: rgba(255, 255, 255, 0.72);
   margin-bottom: 10px;
+}
+.journey-kicker .eyebrow-light {
+  margin-bottom: 0;
+}
+.journey-kicker .chip-level.lv-A1,
+.journey-kicker .chip-level.lv-A2 {
+  background: #e7f0e2;
+  color: #3d6a3a;
+}
+.journey-kicker .chip-level.lv-B1,
+.journey-kicker .chip-level.lv-B2 {
+  background: #e4eef6;
+  color: #2c5f86;
+}
+.journey-kicker .chip-level.lv-C1,
+.journey-kicker .chip-level.lv-C2 {
+  background: #f8e6de;
+  color: #a8432a;
+}
+.level-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.field-status {
+  margin: 0;
+  max-width: 36ch;
+  color: var(--ink-2);
+  font-size: 13px;
+  text-align: right;
 }
 .journey h2 {
   font: 600 clamp(34px, 6vw, 56px) / 1.05 var(--serif);

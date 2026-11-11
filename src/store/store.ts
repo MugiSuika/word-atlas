@@ -155,9 +155,20 @@ export const store = {
         changed({ ...data, datasets: { ...data.datasets, [p.datasetId]: p } });
     }
   },
-  settings(patch: Partial<Settings>) {
-    if (!state.locked)
-      changed({ ...data, settings: { ...data.settings, ...patch } });
+  settings(patch: Partial<Settings>, progress?: Progress) {
+    if (state.locked) return;
+    const settings = { ...data.settings, ...patch };
+    let datasets = data.datasets;
+    if (progress && progress !== datasets[progress.datasetId])
+      datasets = { ...datasets, [progress.datasetId]: progress };
+    if (
+      datasets === data.datasets &&
+      (Object.keys(settings) as (keyof Settings)[]).every(
+        (key) => settings[key] === data.settings[key],
+      )
+    )
+      return;
+    changed({ ...data, settings, datasets });
   },
   adopt(next: LearningData) {
     assign(next);
