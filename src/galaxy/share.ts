@@ -1,7 +1,7 @@
 import { toast } from "../ui/Toast";
 
-const SERIF = '"Fraunces Variable", "Songti SC", "Noto Serif SC", Georgia, serif';
-const SANS = '-apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+const SERIF = '"Anthropic Serif", "Songti SC", "Noto Serif SC", Georgia, serif';
+const SANS = '"Anthropic Sans", -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
 /** "My word galaxy": the live render framed as a 4:5 poster. */
 export async function shareGalaxy(source: HTMLCanvasElement, lit: number, total: number) {

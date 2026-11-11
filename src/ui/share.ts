@@ -1,8 +1,8 @@
 import type { Atlas, Entry } from "../atlas/types";
 import { toast } from "./Toast";
 
-const SERIF = '"Fraunces Variable", "Songti SC", "Noto Serif SC", Georgia, serif';
-const SANS = '-apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif';
+const SERIF = '"Anthropic Serif", "Songti SC", "Noto Serif SC", Georgia, serif';
+const SANS = '"Anthropic Sans", -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif';
 
 function loadImage(src: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
