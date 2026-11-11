@@ -187,8 +187,8 @@ export function BackupControls() {
               <p className="warn-text">这是 v2 单词库备份。</p>
             )}
             <p className="warn-text">
-              确认后将全量替换所有词库的学习记录与设置，其他未包含在文件中的词库记录也会清除。不会合并，昵称、头像和
-              Google 登录身份会保留。
+              确认后将全量替换所有词库的学习记录与设置，其他未包含在文件中的词库记录也会清除。不会改动昵称、头像和
+              Google 登录身份。
             </p>
             {uid && (
               <p className="muted">
