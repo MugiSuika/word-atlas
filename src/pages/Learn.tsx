@@ -19,7 +19,11 @@ import {
   answer,
   advance,
   buildSession,
+  clearJourneyReset,
   gradeFor,
+  peekJourneyReset,
+  reconcileJourney,
+  sessionMatchesLevel,
   sessionStats,
 } from "../store/session";
 import { Rating } from "../store/srs";
@@ -37,26 +41,45 @@ import { AmbiencePicker } from "../ui/Ambience";
 import { Ring } from "../ui/Ring";
 import { Speak } from "../ui/Speak";
 import { shareSession } from "../ui/shareSession";
+import { toast } from "../ui/Toast";
 
 export function Learn() {
   const atlas = useAtlas();
-  const session = useStore((s) => s.progress.session);
+  const progress = useStore((s) => s.progress);
+  const settings = useStore((s) => s.settings);
+  const session = progress.session;
   const locked = useStore((s) => s.locked);
   const owner = useStore((s) => s.owner);
   const [ready, setReady] = useState(false);
+  const mismatched =
+    !!session &&
+    !session.finished &&
+    !sessionMatchesLevel(atlas, progress, settings, session);
 
   useEffect(() => {
     if (locked) return;
-    const { progress, settings } = store.get();
-    if (!progress.session) {
-      const s = buildSession(atlas, progress, settings);
+    const announced = peekJourneyReset();
+    if (announced) {
+      toast(`未完成的旅程已按 ${announced} 重新安排`);
+      clearJourneyReset();
+    }
+    if (reconcileJourney(atlas)) {
+      const name = atlas.cefr[store.get().settings.startLevel] ?? "";
+      if (name && name !== announced)
+        toast(`未完成的旅程已按 ${name} 重新安排`);
+      if (!store.get().progress.session) go({ page: "today" }, null, true);
+      return;
+    }
+    const { progress: current, settings: live } = store.get();
+    if (!current.session) {
+      const s = buildSession(atlas, current, live);
       if (!s.steps.length) {
         go({ page: "today" }, null, true);
         return;
       }
       store.progress((p) => ({ ...p, session: s }));
     }
-  }, [atlas, locked, owner]);
+  }, [atlas, locked, owner, settings.startLevel, session?.id, session?.finished]);
 
   const ids = useMemo(
     () => [...new Set(session?.steps.map((s) => s.id) ?? [])],
@@ -75,7 +98,7 @@ export function Learn() {
 
   useEffect(() => () => stopAudio(), []);
 
-  if (!session || !ready)
+  if (mismatched || !session || !ready)
     return (
       <div className="learn learn-loading">
         <span className="spinner" />
@@ -87,6 +110,9 @@ export function Learn() {
 }
 
 function Runner({ session }: { session: ActiveSession }) {
+  const atlas = useAtlas();
+  const startLevel = useStore((s) => s.settings.startLevel);
+  const levelName = atlas.cefr[startLevel] ?? "";
   const step = session.steps[session.index];
   const total = session.steps.length;
   const exit = () => {
@@ -112,6 +138,9 @@ function Runner({ session }: { session: ActiveSession }) {
           {session.index + 1}
           <small>/{total}</small>
         </span>
+        {levelName && (
+          <span className={`chip chip-level lv-${levelName}`}>{levelName}</span>
+        )}
         <AmbiencePicker />
       </header>
       <main className="learn-stage" key={`${session.id}-${session.index}`}>

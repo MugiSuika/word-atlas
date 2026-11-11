@@ -1,6 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import { useState } from "react";
 import { useAtlas } from "../atlas/context";
+import { alignSession, markJourneyReset } from "../store/session";
 import { store } from "../store/store";
 
 const LEVELS = [
@@ -14,7 +15,23 @@ export function Onboarding() {
   const atlas = useAtlas();
   const [level, setLevel] = useState(1);
   const [goal, setGoal] = useState(10);
-  const finish = () => store.settings({ onboarded: true, startLevel: atlas.cefr.indexOf(LEVELS[level][0]), dailyNew: goal });
+  const finish = () => {
+    const startLevel = atlas.cefr.indexOf(LEVELS[level][0]);
+    const { progress, settings } = store.get();
+    const next = { ...settings, onboarded: true, startLevel, dailyNew: goal };
+    const aligned = alignSession(atlas, progress, next);
+    const previous = progress.session;
+    if (
+      previous &&
+      !previous.finished &&
+      aligned.session?.id !== previous.id
+    )
+      markJourneyReset(LEVELS[level][0]);
+    store.settings(
+      { onboarded: true, startLevel, dailyNew: goal },
+      aligned === progress ? undefined : aligned,
+    );
+  };
   return (
     <div className="onboard" role="dialog" aria-modal="true" aria-label="欢迎">
       <div className="onboard-card">

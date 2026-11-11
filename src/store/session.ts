@@ -44,6 +44,113 @@ export function nextNew(
   return out;
 }
 
+/** Cards as they were before this session introduced its new words. */
+function beforeSessionNews(progress: Progress, session: ActiveSession): Progress {
+  if (!session.newIds.some((id) => progress.cards[id])) return progress;
+  const cards = { ...progress.cards };
+  for (const id of session.newIds) delete cards[id];
+  return { ...progress, cards };
+}
+
+/**
+ * An unfinished journey stays valid when its new words are still the next ones
+ * at the learner's current level. Review-only journeys are not level-scoped.
+ * Already-answered new words are ignored so a matching session is not rebuilt
+ * just because those cards now exist.
+ */
+export function sessionMatchesLevel(
+  atlas: Atlas,
+  progress: Progress,
+  settings: Settings,
+  session: ActiveSession,
+) {
+  if (!session.newIds.length) return true;
+  const prior = beforeSessionNews(progress, session);
+  const expected = nextNew(atlas, prior, settings, session.newIds.length);
+  return (
+    expected.length === session.newIds.length &&
+    expected.every((id, i) => id === session.newIds[i])
+  );
+}
+
+/**
+ * Replace an unfinished journey whose new words belong to another level.
+ * Words already answered stay in memory. New words learned inside the retired
+ * journey do not use up today's quota, so the replacement can still start at
+ * the new level.
+ */
+export function alignSession(
+  atlas: Atlas,
+  progress: Progress,
+  settings: Settings,
+): Progress {
+  const session = progress.session;
+  if (
+    !session ||
+    session.finished ||
+    sessionMatchesLevel(atlas, progress, settings, session)
+  )
+    return progress;
+  const learnedHere = session.newIds.filter((id) => progress.cards[id]).length;
+  const next = buildSession(atlas, progress, {
+    ...settings,
+    dailyNew: settings.dailyNew + learnedHere,
+  });
+  return { ...progress, session: next.steps.length ? next : null };
+}
+
+/** The unfinished journey to show for the learner's current level. */
+export function sessionForLevel(atlas: Atlas, progress: Progress, settings: Settings) {
+  const session = progress.session;
+  if (!session || session.finished) return null;
+  if (sessionMatchesLevel(atlas, progress, settings, session)) return session;
+  const aligned = alignSession(atlas, progress, settings);
+  return aligned.session && !aligned.session.finished ? aligned.session : null;
+}
+
+const RESET_KEY = "word-atlas:journey-reset";
+
+export function markJourneyReset(levelName: string) {
+  try {
+    sessionStorage.setItem(RESET_KEY, levelName);
+  } catch {
+    /* Storage can be unavailable in private mode. */
+  }
+}
+
+export function peekJourneyReset() {
+  try {
+    return sessionStorage.getItem(RESET_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function clearJourneyReset() {
+  try {
+    sessionStorage.removeItem(RESET_KEY);
+  } catch {
+    /* Storage can be unavailable in private mode. */
+  }
+}
+
+/** Persist a level realignment. Returns whether the unfinished journey changed. */
+export function reconcileJourney(atlas: Atlas) {
+  if (store.get().locked) return false;
+  const { progress, settings } = store.get();
+  const session = progress.session;
+  if (
+    !session ||
+    session.finished ||
+    sessionMatchesLevel(atlas, progress, settings, session)
+  )
+    return false;
+  const aligned = alignSession(atlas, progress, settings);
+  if (aligned === progress) return false;
+  store.progress(() => aligned);
+  return true;
+}
+
 export function todayPlan(atlas: Atlas, p: Progress, s: Settings) {
   const due = dueIds(p).filter((id) => atlas.byId.has(id));
   const newLeft = Math.max(0, s.dailyNew - newToday(p));

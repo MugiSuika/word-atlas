@@ -1,9 +1,15 @@
 import { Account } from "../auth/Account";
 import { BackupControls } from "../auth/BackupControls";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useAtlas } from "../atlas/context";
+import {
+  alignSession,
+  clearJourneyReset,
+  markJourneyReset,
+} from "../store/session";
 import { isMastered } from "../store/srs";
 import { dayKey, store, useStore, type Settings } from "../store/store";
+import { toast } from "../ui/Toast";
 
 import { streakOf } from "./Today";
 
@@ -44,6 +50,32 @@ export function Me({ privateAvailable }: { privateAvailable: boolean }) {
   }, [progress]);
 
   const set = (patch: Partial<Settings>) => store.settings(patch);
+  const [levelNote, setLevelNote] = useState("");
+  const chooseLevel = (level: number) => {
+    if (level === settings.startLevel || locked) return;
+    const nextSettings = { ...settings, startLevel: level };
+    const aligned = alignSession(atlas, progress, nextSettings);
+    const previous = progress.session;
+    const retired =
+      !!previous &&
+      !previous.finished &&
+      aligned.session?.id !== previous.id;
+    store.settings(
+      { startLevel: level },
+      aligned === progress ? undefined : aligned,
+    );
+    const name = atlas.cefr[level] ?? "";
+    if (retired && name) {
+      markJourneyReset(name);
+      setLevelNote(
+        `未完成的旅程已按 ${name} 重新安排。回到首页后，进行中的旅程会从 ${name} 继续。`,
+      );
+      toast(`未完成的旅程已按 ${name} 重新安排`);
+    } else {
+      clearJourneyReset();
+      setLevelNote("");
+    }
+  };
   const maxF = Math.max(1, ...stats.forecast);
 
   return (
@@ -139,17 +171,27 @@ export function Me({ privateAvailable }: { privateAvailable: boolean }) {
               ))}
             </div>
           </Field>
-          <Field label="从哪个难度开始" hint="跳过已经熟悉的低级别词。">
-            <div className="segmented">
-              {atlas.cefr.map((l, i) => (
-                <button
-                  key={l}
-                  className={settings.startLevel === i ? "is-on" : ""}
-                  onClick={() => set({ startLevel: i })}
-                >
-                  {l}
-                </button>
-              ))}
+          <Field
+            label="从哪个难度开始"
+            hint="跳过已经熟悉的低级别词。更改后，未完成的旅程会按新等级重新开始。"
+          >
+            <div className="level-choice">
+              <div className="segmented">
+                {atlas.cefr.map((l, i) => (
+                  <button
+                    key={l}
+                    className={settings.startLevel === i ? "is-on" : ""}
+                    onClick={() => chooseLevel(i)}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+              {levelNote && (
+                <p className="field-status" role="status">
+                  {levelNote}
+                </p>
+              )}
             </div>
           </Field>
           <Field
