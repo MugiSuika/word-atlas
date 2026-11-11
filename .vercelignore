@@ -1,0 +1,9 @@
+.git
+.local
+.env*
+node_modules
+dist
+data
+docs
+output
+PUBLIC_MANIFEST.json

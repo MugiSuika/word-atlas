@@ -1,18 +1,25 @@
 import { ArrowRight, Flame, Keyboard, Sparkles } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { prefetch, useAtlas, useEntry } from "../atlas/context";
 import { go, openWord } from "../lib/router";
 import { cue } from "../lib/sound";
 import { hashSeed } from "../lib/text";
-import { buildSession, masteredCount, todayPlan } from "../store/session";
+import { buildSession, clearJourneyReset, markJourneyReset, masteredCount, peekJourneyReset, reconcileJourney, sessionForLevel, todayPlan } from "../store/session";
 import { isMastered } from "../store/srs";
 import { dayKey, store, useStore } from "../store/store";
 import { Galaxy } from "../galaxy/Galaxy";
 import { Highlight, Pronounce } from "../ui/EntryView";
 import { Illustration } from "../ui/Illustration";
 import { Ring } from "../ui/Ring";
+import { toast } from "../ui/Toast";
 
 const BRAND = `${import.meta.env.BASE_URL}brand`;
+
+function resetCopy(levelName: string) {
+  return levelName
+    ? `起点已改为 ${levelName}，这场旅程已按 ${levelName} 重新安排。`
+    : "";
+}
 
 function greeting(h: number) {
   if (h < 5) return "夜深了";
@@ -38,6 +45,23 @@ export function Today() {
   const progress = useStore((s) => s.progress);
   const settings = useStore((s) => s.settings);
   const plan = useMemo(() => todayPlan(atlas, progress, settings), [atlas, progress, settings]);
+  const levelName = atlas.cefr[settings.startLevel] ?? "";
+  const active = useMemo(
+    () => sessionForLevel(atlas, progress, settings),
+    [atlas, progress, settings],
+  );
+  const [resetNote, setResetNote] = useState(() => resetCopy(peekJourneyReset()));
+  useEffect(() => {
+    const marked = peekJourneyReset();
+    if (marked) setResetNote(resetCopy(marked));
+    if (store.get().locked) return;
+    if (!reconcileJourney(atlas)) return;
+    const name = atlas.cefr[store.get().settings.startLevel] ?? "";
+    if (!name) return;
+    markJourneyReset(name);
+    setResetNote(resetCopy(name));
+    toast(`未完成的旅程已按 ${name} 重新安排`);
+  }, [atlas, settings.startLevel, progress.session?.id, progress.session?.finished]);
   // Warm the first cards of today's journey so the session opens instantly.
   const firstIds = [...plan.due.slice(0, 4), ...plan.fresh.slice(0, 6)].join(",");
   useEffect(() => {
@@ -48,18 +72,21 @@ export function Today() {
   const now = new Date();
   const today = progress.days[dayKey()];
   const streak = streakOf(progress.days);
-  const active = progress.session && !progress.session.finished ? progress.session : null;
   const total = plan.due.length + plan.fresh.length;
   const goal = settings.dailyNew + Math.min(plan.due.length, 60);
   const doneToday = today?.r ?? 0;
 
   const start = (opts?: { reviewOnly?: boolean; extra?: number }) => {
-    if (!active) {
-      const s = buildSession(atlas, progress, opts?.extra ? { ...settings, dailyNew: (today?.n ?? 0) + opts.extra } : settings, { reviewOnly: opts?.reviewOnly });
+    clearJourneyReset();
+    reconcileJourney(atlas);
+    const { progress: current, settings: live } = store.get();
+    const ongoing = current.session && !current.session.finished ? current.session : null;
+    if (!ongoing) {
+      const s = buildSession(atlas, current, opts?.extra ? { ...live, dailyNew: (current.days[dayKey()]?.n ?? 0) + opts.extra } : live, { reviewOnly: opts?.reviewOnly });
       if (!s.steps.length) return;
       store.progress((p) => ({ ...p, session: s }));
     }
-    if (settings.sfx) void cue("start");
+    if (live.sfx) void cue("start");
     go({ page: "learn" });
   };
 
@@ -83,20 +110,31 @@ export function Today() {
         <h1 className="display">{greeting(now.getHours())}，探索者。</h1>
       </header>
 
-      <section className={`journey ${total === 0 && !active ? "is-clear" : ""}`}>
+      <section className={`journey ${total === 0 && !active ? "is-clear" : ""}`} aria-label={active ? `${levelName} 旅程进行中` : total > 0 ? `${levelName} 今日旅程` : "今日已完成"}>
         <img className="journey-art" src={`${BRAND}/hero.webp`} alt="" fetchPriority="high" />
         <div className="journey-body">
           {active ? (
             <>
-              <p className="eyebrow eyebrow-light">旅程进行中</p>
+              <div className="journey-kicker">
+                {levelName && <span className={`chip chip-level lv-${levelName}`}>{levelName}</span>}
+                <p className="eyebrow eyebrow-light">旅程进行中</p>
+              </div>
               <h2>
                 还剩 <b>{active.steps.length - active.index}</b> 步
               </h2>
-              <p className="journey-lede">进度已保存，随时接着走。</p>
+              <p className="journey-lede">
+                {resetNote ||
+                  (active.newIds.length
+                    ? `从 ${levelName} 继续。进度已保存，随时接着走。`
+                    : "进度已保存，随时接着走。")}
+              </p>
             </>
           ) : total > 0 ? (
             <>
-              <p className="eyebrow eyebrow-light">今日旅程</p>
+              <div className="journey-kicker">
+                {levelName && <span className={`chip chip-level lv-${levelName}`}>{levelName}</span>}
+                <p className="eyebrow eyebrow-light">今日旅程</p>
+              </div>
               <h2>
                 {plan.due.length > 0 && (
                   <>
@@ -110,13 +148,16 @@ export function Today() {
                   </>
                 )}
               </h2>
-              <p className="journey-lede">约 {plan.minutes} 分钟。先温故，再知新。</p>
+              <p className="journey-lede">从 {levelName} 出发，约 {plan.minutes} 分钟。先温故，再知新。</p>
             </>
           ) : (
             <>
-              <p className="eyebrow eyebrow-light">今日已完成</p>
+              <div className="journey-kicker">
+                {levelName && <span className={`chip chip-level lv-${levelName}`}>{levelName}</span>}
+                <p className="eyebrow eyebrow-light">今日已完成</p>
+              </div>
               <h2>今天的星，都亮了。</h2>
-              <p className="journey-lede">记忆需要一点留白。想多走一段，也可以。</p>
+              <p className="journey-lede">{resetNote || "记忆需要一点留白。想多走一段，也可以。"}</p>
             </>
           )}
           {teaser.length > 0 && (
@@ -286,6 +327,7 @@ function LevelPath() {
           <i className="lg-seen" /> 已学 <i className="lg-done" /> 已掌握
         </span>
       </div>
+      <p className="muted">点击等级浏览图鉴；在今日旅程中首次作答后计入已学。</p>
       <ol className="route">
         {levels.map((l, i) => {
           const seen = l.seen / Math.max(1, l.total);

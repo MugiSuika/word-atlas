@@ -7,7 +7,7 @@
 **One word, one picture. Light up your IELTS vocabulary.**<br>
 7,298 core words · 14,596 original example sentences · 7,298 illustrations · UK & US audio · FSRS spaced repetition
 
-[**Open the app →**](https://0xlei.tech/words/) &nbsp;·&nbsp; [▶ Launch film](docs/assets/launch.mp4) &nbsp;·&nbsp; [Download the dataset](data/) &nbsp;·&nbsp; [**Follow on X →**](https://x.com/yangleiocx3) &nbsp;·&nbsp; [中文](README.md)
+[**Open the app →**](https://word-atlas.vidu8.online/) &nbsp;·&nbsp; [▶ Launch film](docs/assets/launch.mp4) &nbsp;·&nbsp; [Download the dataset](data/) &nbsp;·&nbsp; [**Follow on X →**](https://x.com/yangleiocx3) &nbsp;·&nbsp; [中文](README.md)
 
 <a href="docs/assets/launch.mp4"><img src="docs/assets/launch-preview.webp" alt="Word Atlas launch film highlights" width="100%"></a>
 
@@ -27,7 +27,7 @@ Every definition, sentence, illustration and recording was made new for this pro
 | **7,298** | original illustrations |
 | **14,596** | original example sentences with Chinese translations |
 | **22,905** | audio clips: UK and US pronunciation, narrated examples |
-| **0** | accounts, ads or trackers |
+| **0** | mandatory accounts, ads or trackers |
 
 <p align="center"><a href="docs/assets/demo.mp4"><b>▶ Watch the 30-second app demo</b></a></p>
 
@@ -69,6 +69,10 @@ npm test
 npm run check:atlas
 npm run build      # static site in dist/; ATLAS_BASE=/sub/path/ for sub-path hosting
 ```
+
+## Optional accounts and Vercel
+
+Optional Google-only login, logout and session persistence use Supabase Auth; there is no email registration or password login UI. Learning progress remains local; cross-device progress sync is not implemented. See [setup and deployment](docs/auth-and-vercel.md) for Vercel Marketplace integration, public environment variables and email callback configuration.
 
 ## How the content was made
 

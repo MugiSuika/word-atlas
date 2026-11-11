@@ -2,7 +2,16 @@ import type { Atlas, WordRef } from "../atlas/types";
 import { MEDIA } from "../atlas/types";
 import { hashSeed, normalize, shuffle } from "../lib/text";
 import { isMastered, review, Rating, type Grade } from "./srs";
-import { bumpDay, dayKey, store, type ActiveSession, type Progress, type QuizKind, type Settings, type Step } from "./store";
+import {
+  bumpDay,
+  dayKey,
+  store,
+  type ActiveSession,
+  type Progress,
+  type QuizKind,
+  type Settings,
+  type Step,
+} from "./store";
 
 export function dueIds(p: Progress, now = Date.now()) {
   return Object.entries(p.cards)
@@ -16,7 +25,12 @@ export function newToday(p: Progress) {
 }
 
 /** Next unseen words along the learning path, starting at the learner's level. */
-export function nextNew(atlas: Atlas, p: Progress, settings: Settings, count: number) {
+export function nextNew(
+  atlas: Atlas,
+  p: Progress,
+  settings: Settings,
+  count: number,
+) {
   const out: string[] = [];
   const pass = (from: number) => {
     for (const w of atlas.words) {
@@ -30,14 +44,130 @@ export function nextNew(atlas: Atlas, p: Progress, settings: Settings, count: nu
   return out;
 }
 
+/** Cards as they were before this session introduced its new words. */
+function beforeSessionNews(progress: Progress, session: ActiveSession): Progress {
+  if (!session.newIds.some((id) => progress.cards[id])) return progress;
+  const cards = { ...progress.cards };
+  for (const id of session.newIds) delete cards[id];
+  return { ...progress, cards };
+}
+
+/**
+ * An unfinished journey stays valid when its new words are still the next ones
+ * at the learner's current level. Review-only journeys are not level-scoped.
+ * Already-answered new words are ignored so a matching session is not rebuilt
+ * just because those cards now exist.
+ */
+export function sessionMatchesLevel(
+  atlas: Atlas,
+  progress: Progress,
+  settings: Settings,
+  session: ActiveSession,
+) {
+  if (!session.newIds.length) return true;
+  const prior = beforeSessionNews(progress, session);
+  const expected = nextNew(atlas, prior, settings, session.newIds.length);
+  return (
+    expected.length === session.newIds.length &&
+    expected.every((id, i) => id === session.newIds[i])
+  );
+}
+
+/**
+ * Replace an unfinished journey whose new words belong to another level.
+ * Words already answered stay in memory. New words learned inside the retired
+ * journey do not use up today's quota, so the replacement can still start at
+ * the new level.
+ */
+export function alignSession(
+  atlas: Atlas,
+  progress: Progress,
+  settings: Settings,
+): Progress {
+  const session = progress.session;
+  if (
+    !session ||
+    session.finished ||
+    sessionMatchesLevel(atlas, progress, settings, session)
+  )
+    return progress;
+  const learnedHere = session.newIds.filter((id) => progress.cards[id]).length;
+  const next = buildSession(atlas, progress, {
+    ...settings,
+    dailyNew: settings.dailyNew + learnedHere,
+  });
+  return { ...progress, session: next.steps.length ? next : null };
+}
+
+/** The unfinished journey to show for the learner's current level. */
+export function sessionForLevel(atlas: Atlas, progress: Progress, settings: Settings) {
+  const session = progress.session;
+  if (!session || session.finished) return null;
+  if (sessionMatchesLevel(atlas, progress, settings, session)) return session;
+  const aligned = alignSession(atlas, progress, settings);
+  return aligned.session && !aligned.session.finished ? aligned.session : null;
+}
+
+const RESET_KEY = "word-atlas:journey-reset";
+
+export function markJourneyReset(levelName: string) {
+  try {
+    sessionStorage.setItem(RESET_KEY, levelName);
+  } catch {
+    /* Storage can be unavailable in private mode. */
+  }
+}
+
+export function peekJourneyReset() {
+  try {
+    return sessionStorage.getItem(RESET_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function clearJourneyReset() {
+  try {
+    sessionStorage.removeItem(RESET_KEY);
+  } catch {
+    /* Storage can be unavailable in private mode. */
+  }
+}
+
+/** Persist a level realignment. Returns whether the unfinished journey changed. */
+export function reconcileJourney(atlas: Atlas) {
+  if (store.get().locked) return false;
+  const { progress, settings } = store.get();
+  const session = progress.session;
+  if (
+    !session ||
+    session.finished ||
+    sessionMatchesLevel(atlas, progress, settings, session)
+  )
+    return false;
+  const aligned = alignSession(atlas, progress, settings);
+  if (aligned === progress) return false;
+  store.progress(() => aligned);
+  return true;
+}
+
 export function todayPlan(atlas: Atlas, p: Progress, s: Settings) {
   const due = dueIds(p).filter((id) => atlas.byId.has(id));
   const newLeft = Math.max(0, s.dailyNew - newToday(p));
   const fresh = nextNew(atlas, p, s, newLeft);
-  return { due, fresh, minutes: Math.max(1, Math.round(due.length * 0.25 + fresh.length * 0.9)) };
+  return {
+    due,
+    fresh,
+    minutes: Math.max(1, Math.round(due.length * 0.25 + fresh.length * 0.9)),
+  };
 }
 
-function quizKind(ref: WordRef, p: Progress, s: Settings, salt: number): QuizKind {
+function quizKind(
+  ref: WordRef,
+  p: Progress,
+  s: Settings,
+  salt: number,
+): QuizKind {
   const c = p.cards[ref.id];
   const hasImg = !!(ref.media & MEDIA.img);
   const roll = hashSeed(ref.id + salt) % 100;
@@ -45,12 +175,18 @@ function quizKind(ref: WordRef, p: Progress, s: Settings, salt: number): QuizKin
     if (hasImg && roll < 45) return "picture";
     return roll < 80 ? "meaning" : "listen";
   }
-  if (s.spell && (c.s >= 4 || roll < 35)) return roll < 75 ? "spell" : hasImg ? "picture" : "listen";
+  if (s.spell && (c.s >= 4 || roll < 35))
+    return roll < 75 ? "spell" : hasImg ? "picture" : "listen";
   return roll < 50 ? "listen" : hasImg ? "picture" : "meaning";
 }
 
 /** Distractors that look plausible: same level, similar spelling or length, different meaning. */
-export function distractors(atlas: Atlas, ref: WordRef, kind: QuizKind, seed: number) {
+export function distractors(
+  atlas: Atlas,
+  ref: WordRef,
+  kind: QuizKind,
+  seed: number,
+) {
   const target = normalize(ref.word);
   const zhCore = ref.zh.replace(/^[a-z.]+\s*/, "").split(/[；;，,]/)[0];
   const scored: [number, WordRef][] = [];
@@ -83,16 +219,33 @@ export function distractors(atlas: Atlas, ref: WordRef, kind: QuizKind, seed: nu
   return shuffle([ref.id, ...picks], seed);
 }
 
-export function buildSession(atlas: Atlas, p: Progress, s: Settings, opts?: { ids?: string[]; reviewOnly?: boolean }): ActiveSession {
+export function buildSession(
+  atlas: Atlas,
+  p: Progress,
+  s: Settings,
+  opts?: { ids?: string[]; reviewOnly?: boolean },
+): ActiveSession {
   const seed = Date.now();
   const plan = todayPlan(atlas, p, s);
-  const reviewIds = opts?.ids ? opts.ids.filter((id) => p.cards[id]) : plan.due.slice(0, 120);
-  const newIds = opts?.ids ? opts.ids.filter((id) => !p.cards[id]) : opts?.reviewOnly ? [] : plan.fresh;
+  const reviewIds = opts?.ids
+    ? opts.ids.filter((id) => Object.hasOwn(p.cards, id))
+    : plan.due.slice(0, 120);
+  const newIds = opts?.ids
+    ? opts.ids.filter((id) => !Object.hasOwn(p.cards, id))
+    : opts?.reviewOnly
+      ? []
+      : plan.fresh;
   const steps: Step[] = [];
   const quiz = (id: string, salt: number): Step => {
     const ref = atlas.byId.get(id)!;
     const kind = quizKind(ref, p, s, seed + salt);
-    return { id, kind, options: kind === "spell" ? undefined : distractors(atlas, ref, kind, seed + salt) };
+    return {
+      id,
+      kind,
+      ...(kind === "spell"
+        ? {}
+        : { options: distractors(atlas, ref, kind, seed + salt) }),
+    };
   };
   // Reviews first while attention is fresh, then new words in small groups:
   // meet five, then recall those five in a different order.
@@ -100,12 +253,27 @@ export function buildSession(atlas: Atlas, p: Progress, s: Settings, opts?: { id
   for (let g = 0; g < newIds.length; g += 5) {
     const group = newIds.slice(g, g + 5);
     group.forEach((id) => steps.push({ id, kind: "intro" }));
-    shuffle(group, seed + g).forEach((id, i) => steps.push(quiz(id, 1000 + g + i)));
+    shuffle(group, seed + g).forEach((id, i) =>
+      steps.push(quiz(id, 1000 + g + i)),
+    );
   }
-  return { id: `s${seed}`, started: seed, steps, index: 0, graded: {}, newIds, reviewIds };
+  return {
+    id: `s${seed}`,
+    started: seed,
+    steps,
+    index: 0,
+    graded: {},
+    newIds,
+    reviewIds,
+  };
 }
 
-export function gradeFor(kind: QuizKind, correct: boolean, ms: number, hinted: boolean): Grade {
+export function gradeFor(
+  kind: QuizKind,
+  correct: boolean,
+  ms: number,
+  hinted: boolean,
+): Grade {
   if (!correct) return Rating.Again;
   if (hinted) return Rating.Hard;
   const slow = kind === "spell" ? 20000 : 9000;
@@ -116,31 +284,79 @@ export function gradeFor(kind: QuizKind, correct: boolean, ms: number, hinted: b
 }
 
 /** Apply an answer. Only the first attempt for a word in a session updates memory and stats. */
-export function answer(atlas: Atlas, step: Step & { kind: QuizKind }, correct: boolean, grade: Grade, value: string) {
+export function answer(
+  atlas: Atlas,
+  step: Step & { kind: QuizKind },
+  correct: boolean,
+  grade: Grade,
+  value: string,
+) {
   const { settings } = store.get();
   store.progress((p) => {
     const sess = p.session;
-    if (!sess) return p;
-    let next: Progress = { ...p, session: { ...sess, pending: { correct, value } } };
-    const first = !(step.id in sess.graded) && !step.retry;
+    if (
+      !sess ||
+      sess.pending ||
+      sess.finished ||
+      sess.steps[sess.index]?.id !== step.id ||
+      sess.steps[sess.index]?.kind !== step.kind
+    )
+      return p;
+    let next: Progress = {
+      ...p,
+      session: { ...sess, pending: { correct, value } },
+    };
+    const first = !Object.hasOwn(sess.graded, step.id) && !step.retry;
     if (first) {
       next = {
         ...next,
-        cards: { ...next.cards, [step.id]: review(p.cards[step.id], grade, Date.now(), settings.retention) },
-        session: { ...next.session!, graded: { ...sess.graded, [step.id]: grade } },
-        mistakes: correct ? next.mistakes : [step.id, ...next.mistakes.filter((x) => x !== step.id)].slice(0, 300),
+        cards: {
+          ...next.cards,
+          [step.id]: review(
+            p.cards[step.id],
+            grade,
+            Date.now(),
+            settings.retention,
+          ),
+        },
+        session: {
+          ...next.session!,
+          graded: { ...sess.graded, [step.id]: grade },
+        },
+        mistakes: correct
+          ? next.mistakes
+          : [step.id, ...next.mistakes.filter((x) => x !== step.id)].slice(
+              0,
+              300,
+            ),
       };
-      next = bumpDay(next, { r: 1, c: correct ? 1 : 0, n: sess.newIds.includes(step.id) ? 1 : 0 });
+      next = bumpDay(next, {
+        r: 1,
+        c: correct ? 1 : 0,
+        n: sess.newIds.includes(step.id) ? 1 : 0,
+      });
     }
     if (!correct) {
       // Practise it again a few steps later in another format; never re-graded.
       const steps = [...next.session!.steps];
-      const retries = steps.filter((x) => x.id === step.id && "retry" in x && x.retry).length;
+      const retries = steps.filter(
+        (x) => x.id === step.id && "retry" in x && x.retry,
+      ).length;
       if (retries < 2) {
         const ref = atlas.byId.get(step.id)!;
-        const kind: QuizKind = step.kind === "meaning" ? (ref.media & MEDIA.img ? "picture" : "listen") : "meaning";
+        const kind: QuizKind =
+          step.kind === "meaning"
+            ? ref.media & MEDIA.img
+              ? "picture"
+              : "listen"
+            : "meaning";
         const at = Math.min(steps.length, sess.index + 4);
-        steps.splice(at, 0, { id: step.id, kind, retry: true, options: distractors(atlas, ref, kind, Date.now()) });
+        steps.splice(at, 0, {
+          id: step.id,
+          kind,
+          retry: true,
+          options: distractors(atlas, ref, kind, Date.now()),
+        });
         next = { ...next, session: { ...next.session!, steps } };
       }
     }
@@ -152,18 +368,35 @@ export function answer(atlas: Atlas, step: Step & { kind: QuizKind }, correct: b
 export function advance(seconds: number) {
   store.progress((p) => {
     const s = p.session;
-    if (!s) return p;
+    if (
+      !s ||
+      s.finished ||
+      s.index >= s.steps.length ||
+      (s.steps[s.index]?.kind !== "intro" && !s.pending)
+    )
+      return p;
     const index = s.index + 1;
     const finished = index >= s.steps.length ? Date.now() : undefined;
-    const next = bumpDay(p, { t: Math.max(0, Math.min(90, Math.round(seconds))) });
-    return { ...next, session: { ...s, index, pending: undefined, finished } };
+    const next = bumpDay(p, {
+      t: Math.max(0, Math.min(90, Math.round(seconds))),
+    });
+    const session: ActiveSession = { ...s, index };
+    delete session.pending;
+    if (finished !== undefined) session.finished = finished;
+    else delete session.finished;
+    return { ...next, session };
   });
 }
 
 export function sessionStats(s: ActiveSession) {
   const graded = Object.values(s.graded);
   const correct = graded.filter((g) => g !== Rating.Again).length;
-  return { total: graded.length, correct, accuracy: graded.length ? Math.round((correct / graded.length) * 100) : 0 };
+  return {
+    total: graded.length,
+    correct,
+    accuracy: graded.length ? Math.round((correct / graded.length) * 100) : 0,
+  };
 }
 
-export const masteredCount = (p: Progress) => Object.values(p.cards).filter(isMastered).length;
+export const masteredCount = (p: Progress) =>
+  Object.values(p.cards).filter(isMastered).length;
