@@ -2,9 +2,9 @@
 
 ## 代码 / Code
 
-源代码与界面设计采用 [MIT License](LICENSE)。依赖包保留各自授权；Fraunces 字体为 SIL Open Font License 1.1。
+源代码与界面设计采用 [MIT License](LICENSE)。依赖包保留各自授权；界面字体为 Anthropic Serif / Anthropic Sans（随仓库自托管）。
 
-Source code and UI design are under the [MIT License](LICENSE). Dependencies keep their own licenses; the Fraunces typeface is under the SIL Open Font License 1.1.
+Source code and UI design are under the [MIT License](LICENSE). Dependencies keep their own licenses; UI typefaces are Anthropic Serif / Anthropic Sans (self-hosted in this repository).
 
 ## 词库内容、插画与录音 / Dataset, illustrations and recordings
 

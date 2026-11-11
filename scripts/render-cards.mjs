@@ -13,8 +13,11 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const appArg = process.argv.indexOf("--app");
 const app = appArg > 0 ? process.argv[appArg + 1] : null;
 const index = JSON.parse(fs.readFileSync(path.join(root, "public/atlas/index.json"), "utf8"));
-const font = pathToFileURL(path.join(root, "node_modules/@fontsource-variable/fraunces/files/fraunces-latin-opsz-normal.woff2")).href;
-const fontItalic = pathToFileURL(path.join(root, "node_modules/@fontsource-variable/fraunces/files/fraunces-latin-opsz-italic.woff2")).href;
+const fontDir = path.join(root, "src/assets/fonts/anthropic");
+const font = pathToFileURL(path.join(fontDir, "AnthropicSerif-Display-Semibold.otf")).href;
+const fontItalic = pathToFileURL(path.join(fontDir, "AnthropicSerif-Display-RegularItalic.otf")).href;
+const fontSans = pathToFileURL(path.join(fontDir, "AnthropicSans-Text-Regular.otf")).href;
+const fontSansSemi = pathToFileURL(path.join(fontDir, "AnthropicSans-Text-Semibold.otf")).href;
 const thumb = (id) => pathToFileURL(path.join(root, "public/atlas/thumb", `${id}.webp`)).href;
 
 // Illustrated words, spread across levels and topics, deterministic.
@@ -28,11 +31,13 @@ const pick = (n, seed = 7) => {
 
 const fmt = (n) => n.toLocaleString("en-US");
 const base = `
-@font-face{font-family:F;src:url(${font}) format("woff2");font-weight:100 900}
-@font-face{font-family:F;font-style:italic;src:url(${fontItalic}) format("woff2");font-weight:100 900}
+@font-face{font-family:F;src:url(${font}) format("opentype");font-weight:600;font-style:normal}
+@font-face{font-family:F;src:url(${fontItalic}) format("opentype");font-weight:400;font-style:italic}
+@font-face{font-family:S;src:url(${fontSans}) format("opentype");font-weight:400;font-style:normal}
+@font-face{font-family:S;src:url(${fontSansSemi}) format("opentype");font-weight:600;font-style:normal}
 *{box-sizing:border-box;margin:0}
-body{background:#f3ecdf;color:#1e2640;font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;-webkit-font-smoothing:antialiased}
-.serif{font-family:F,"Songti SC","STSong",serif;font-variation-settings:"opsz" 144}
+body{background:#f3ecdf;color:#1e2640;font-family:S,-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;-webkit-font-smoothing:antialiased}
+.serif{font-family:F,"Songti SC","STSong",serif}
 .mosaic{display:grid;gap:10px}
 .mosaic figure{position:relative;border-radius:14px;overflow:hidden;background:#ece3d2;box-shadow:0 10px 24px -14px rgba(30,38,64,.45)}
 .mosaic img{width:100%;height:100%;object-fit:cover;display:block}
