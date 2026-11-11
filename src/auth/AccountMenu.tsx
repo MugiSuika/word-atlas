@@ -87,7 +87,7 @@ export function AccountMenu() {
   }, [open]);
   if (!session)
     return (
-      <a href="#/me" className="icon-btn" aria-label="Google 登录">
+      <a href="#/me" className="icon-btn" aria-label="登录">
         <Avatar key="guest" />
       </a>
     );

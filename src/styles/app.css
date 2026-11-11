@@ -4123,20 +4123,27 @@ a:hover .mark-needle,
 
 /* ---------- optional user account ---------- */
 .account-panel { margin-bottom: 24px; }
-.account-heading, .account-identity { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.account-heading h2 { font-size: 22px; }
-.account-panel > .muted { margin: 12px 0 18px; }
+.account-signin > .eyebrow { margin-bottom: 8px; }
+.account-note { margin: 0; max-width: 36em; color: var(--ink-3); font-size: 13.5px; line-height: 1.55; }
+.account-signin > .account-note { margin-bottom: 16px; }
 .account-form { display: grid; gap: 16px; max-width: 440px; }
 .account-form label { display: grid; gap: 8px; font-size: 14px; font-weight: 500; }
 .account-form input { min-width: 0; width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--paper); color: var(--ink); font: inherit; font-size: 16px; }
 .account-form input:focus-visible { outline: 2px solid var(--terra); outline-offset: 2px; }
 .account-form input:disabled { opacity: 0.6; }
 .account-form small { font-weight: 400; }
-.account-panel [role="alert"], .account-panel > [role="status"] { margin-top: 16px; }
-.account-identity span { overflow-wrap: anywhere; min-width: 0; }
+.account-panel [role="alert"], .account-panel > [role="status"]:not(.account-note) { margin-top: 16px; }
 .account-profile-form { margin: 20px 0; }
 
-.account-google { display: grid; justify-items: start; gap: 12px; }
+.btn.btn-google { height: 44px; padding: 0 16px 0 14px; gap: 10px; border-radius: 12px; border: 1px solid #dadce0; background: #fff; color: #1f1f1f; font-weight: 500; box-shadow: none; }
+.btn.btn-google:hover:not(:disabled) { background: #f8f9fa; border-color: #c6c8cc; transform: none; box-shadow: none; }
+.btn.btn-google:active:not(:disabled) { background: #f1f3f4; transform: none; }
+.btn.btn-google:disabled { opacity: 0.62; }
+.google-mark { width: 18px; height: 18px; display: block; flex: none; }
+:root[data-theme="dark"] .btn.btn-google { border-color: rgba(255, 255, 255, 0.32); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .btn.btn-google { border-color: rgba(255, 255, 255, 0.32); }
+}
 
 /* Shared account profile, synchronization and backup controls. */
 .account-avatar { display:inline-flex; flex:none; width:32px; height:32px; border-radius:50%; overflow:hidden; align-items:center; justify-content:center; background:var(--paper); color:var(--ink); }
@@ -4148,9 +4155,13 @@ a:hover .mark-needle,
 .account-dropdown p { overflow-wrap:anywhere; padding:8px 12px; font-size:13px; color:var(--ink-3); }
 .account-dropdown [role="menuitem"] { display:flex; align-items:center; gap:10px; width:100%; padding:12px; border:0; border-radius:10px; background:none; font:inherit; font-size:14px; color:var(--ink); text-align:left; text-decoration:none; }
 .account-dropdown [role="menuitem"]:hover,.account-dropdown [role="menuitem"]:focus-visible { background:var(--paper-2); outline:2px solid var(--line); }
-.account-profile-summary { display:flex; align-items:center; gap:18px; margin:20px 0; }
-.account-profile-summary>div { display:grid; gap:8px; min-width:0; overflow-wrap:anywhere; }
-.sync-status { margin:12px 0; font-size:14px; }
+.account-profile-summary { display:flex; align-items:flex-start; gap:16px; margin:0; }
+.account-profile-copy { display:grid; gap:2px; justify-items:start; min-width:0; padding-top:6px; overflow-wrap:anywhere; }
+.account-name { font-family:var(--serif); font-weight:600; font-size:22px; line-height:1.25; letter-spacing:-0.02em; font-variation-settings:"opsz" 36; }
+.account-email { color:var(--ink-3); font-size:13px; line-height:1.45; }
+.account-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.account-actions .btn { height:36px; padding:0 14px; font-size:13.5px; font-weight:500; }
+.sync-status { margin:4px 0 0; font-size:12.5px; line-height:1.4; color:var(--ink-3); }
 .profile-editor { margin-top:20px; max-width:none; }
 .avatar-preview { width:100%; min-height:110px; display:flex; align-items:center; justify-content:center; padding:15px; border:1px dashed var(--line); border-radius:16px; }
 .avatar-preview>img { width:112px; height:112px; border-radius:12px; object-fit:cover; }
