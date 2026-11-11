@@ -1,10 +1,9 @@
-import "@fontsource-variable/fraunces/opsz.css";
-import "@fontsource-variable/fraunces/opsz-italic.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import { AccountDataProvider } from "./auth/AccountDataProvider";
 import { AuthProvider } from "./auth/AuthProvider";
+import "./styles/fonts.css";
 import "./styles/app.css";
 
 createRoot(document.getElementById("root")!).render(

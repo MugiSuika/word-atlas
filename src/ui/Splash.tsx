@@ -76,7 +76,7 @@ function targets(w: number, h: number, count: number) {
   g.textBaseline = "middle";
   g.fillText("词光", cx, cy + R + zh * 0.78);
   const en = Math.max(18, zh * 0.24);
-  g.font = `700 ${en}px "Fraunces Variable", Georgia, serif`;
+  g.font = `700 ${en}px "Anthropic Serif", Georgia, serif`;
   g.letterSpacing = `${en * 0.34}px`;
   g.fillText("WORD ATLAS", cx, cy + R + zh * 1.52);
   const data = g.getImageData(0, 0, w, h).data;

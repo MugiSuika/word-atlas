@@ -211,7 +211,7 @@ npm run build       # 生产构建，输出到 dist/
 
 - 代码：[MIT](LICENSE)
 - 词库文本、插画、录音：[CC BY 4.0](CONTENT_LICENSE.md)，署名 “Word Atlas contributors（词光）”
-- 字体 Fraunces：SIL Open Font License；记忆算法 [ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs)：MIT
+- 字体 Anthropic Serif / Anthropic Sans（仓库自托管）；记忆算法 [ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs)：MIT
 
 ## Star 趋势
 
