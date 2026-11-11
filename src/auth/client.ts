@@ -12,7 +12,10 @@ export const supabase = config
         flowType: "pkce",
         persistSession: true,
         autoRefreshToken: true,
-        detectSessionInUrl: true,
+        // Exchange the PKCE code ourselves. Automatic detection treats any
+        // `error` parameter as a failed implicit grant and never exchanges a
+        // `code` that arrived on the same URL, so the session is never stored.
+        detectSessionInUrl: false,
       },
     })
   : null;

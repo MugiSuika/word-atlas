@@ -341,6 +341,58 @@ test("uses Google OAuth with PKCE and returns to the account page", async (t) =>
   assert.ok(!page.url().includes("code="));
   assert.deepEqual(errors, []);
 });
+test("exchanges a pkce code that arrives beside an oauth error and keeps the session", async (t) => {
+  const { page, context, requests, errors } = await fixture(t);
+  let redirected = false;
+  await context.route(`${authOrigin}/auth/v1/authorize**`, async (route) => {
+    redirected = true;
+    await route.fulfill({
+      status: 302,
+      headers: {
+        location: `${base}/?auth_callback=1&code=mock-google-code&error=server_error&error_code=unexpected_failure&error_description=Unable+to+exchange#error=server_error&sb=`,
+      },
+    });
+  });
+  await login(page);
+  assert.equal(redirected, true);
+  assert.equal(
+    await page
+      .getByRole("alert")
+      .filter({ hasText: "Google 登录未完成" })
+      .count(),
+    0,
+  );
+  assert.ok(
+    requests.some(
+      (r) =>
+        r.path === "/auth/v1/token" && r.query.get("grant_type") === "pkce",
+    ),
+  );
+  assert.equal(new URL(page.url()).hash, "#/me");
+  assert.ok(!page.url().includes("code="));
+  assert.ok(!page.url().includes("error="));
+  const token = await page.evaluate(() =>
+    localStorage.getItem("sb-word-atlas-auth-test-auth-token"),
+  );
+  assert.ok(token);
+  await page.reload();
+  await page.getByRole("button", { name: "退出登录" }).waitFor();
+  const reopened = await context.newPage();
+  t.after(() => reopened.close());
+  await reopened.goto(`${base}/#/me`);
+  await reopened.getByRole("button", { name: "退出登录" }).waitFor();
+  await page.close();
+  await reopened.reload();
+  await reopened.getByRole("button", { name: "退出登录" }).waitFor();
+  assert.equal(
+    await reopened
+      .getByRole("alert")
+      .filter({ hasText: "Google 登录未完成" })
+      .count(),
+    0,
+  );
+  assert.deepEqual(errors, []);
+});
 test("restores Google sessions, saves the own-user profile and preserves progress on logout", async (t) => {
   const { page, requests, errors } = await fixture(t);
   await page.evaluate(() =>
